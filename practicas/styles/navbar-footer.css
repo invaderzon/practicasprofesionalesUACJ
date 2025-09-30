@@ -208,7 +208,7 @@
 }
 .nav-portal .tab.activa{
   --alza: .5rem;
-  background: var(--color-fondo);
+  background-color: var(--color-fondo);
   color: var(--color-principal);
   margin-top: calc(var(--alza) * -1);
   padding-top: calc(.625rem + var(--alza));

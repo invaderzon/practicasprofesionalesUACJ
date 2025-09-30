@@ -5,12 +5,12 @@ import { supabase } from "../../lib/supabaseClient";
 import Navbar from "../../components/navbar";
 import Footer from "../../components/footer";
 
-/* ---------- Catálogos mostrados en UI (bonitos) ---------- */
+/* ---------- UI: catálogos ---------- */
 const MODALIDADES = ["Presencial", "Híbrida", "Remota"];
 const COMPENSACIONES = ["Apoyo económico", "Sin apoyo"];
 const IDIOMAS = ["ES", "EN"];
 
-/* ---------- Normalizador y Mapas UI <-> BD ---------- */
+/* ---------- UI: normalizador y mapeos ---------- */
 const norm = (s) =>
   String(s || "")
     .toLowerCase()
@@ -22,7 +22,7 @@ const norm = (s) =>
 const mapUIToDB_mod = (v) => {
   const k = norm(v);
   if (k === "presencial") return "presencial";
-  if (k === "hibrida" || k === "hibrido") return "híbrido"; // en BD con tilde
+  if (k === "hibrida" || k === "hibrido") return "híbrido";
   if (k === "remota" || k === "remoto") return "remoto";
   return null;
 };
@@ -44,7 +44,7 @@ const MAP_DB_TO_UI = {
 const fmtMod = (dbVal) => MAP_DB_TO_UI.modalidad[dbVal] ?? dbVal ?? "Modalidad N/A";
 const fmtComp = (dbVal) => MAP_DB_TO_UI.comp[dbVal] ?? dbVal ?? "Compensación N/A";
 
-/* ---------- IconButtons ---------- */
+/* ---------- UI: icon buttons ---------- */
 function IconBtn({ title, onClick, children }) {
   return (
     <button
@@ -68,16 +68,12 @@ function IconBtn({ title, onClick, children }) {
     </button>
   );
 }
-
 function IconBookmark({ active = false }) {
-  if (active) {
-    return (
-      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-        <path fill="#2563eb" d="M6 2h12a1 1 0 0 1 1 1v18l-7-4-7 4V3a1 1 0 0 1 1-1Z" />
-      </svg>
-    );
-  }
-  return (
+  return active ? (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+      <path fill="#2563eb" d="M6 2h12a1 1 0 0 1 1 1v18l-7-4-7 4V3a1 1 0 0 1 1-1Z" />
+    </svg>
+  ) : (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
       <path
         fill="none"
@@ -88,7 +84,6 @@ function IconBookmark({ active = false }) {
     </svg>
   );
 }
-
 function IconBan() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
@@ -103,35 +98,129 @@ function IconBan() {
   );
 }
 
+/* ---------- UI: logo empresa (o iniciales) ---------- */
+function LogoSquare({ src, name }) {
+  const makeInitials = (raw) => {
+    if (typeof raw !== "string") return "?";
+    const cleaned = raw.replace(/\s+/g, " ").trim();
+    if (!cleaned) return "?";
+    const stop = new Set(["de", "del", "la", "las", "el", "los", "the", "of"]);
+    const parts = cleaned.split(" ").filter(Boolean).filter(w => !stop.has(w.toLowerCase()));
+    if (parts.length === 0) return "?";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+  const initials = makeInitials(name);
+
+  if (src) {
+    return (
+      <div className="jobs-logo" style={{ width: 40, height: 40 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={name || "Logo de la empresa"} />
+      </div>
+    );
+  }
+  return (
+    <div
+      className="jobs-logo-fallback"
+      aria-label={name || "Empresa"}
+      style={{
+        width: 40, height: 40, background: "#e5e7eb", color: "#374151",
+        display: "grid", placeItems: "center", borderRadius: 6, fontWeight: 700
+      }}
+    >
+      <span style={{ fontSize: "0.85rem" }}>{initials}</span>
+    </div>
+  );
+}
+
+/* ---------- UI: helpers ---------- */
+function splitLines(text) {
+  const arr = String(text || "").split(/\r?\n|•|- /).map((s) => s.trim()).filter(Boolean);
+  return arr.length ? arr : ["No disponible"];
+}
+function Pill({ label, value, options = [], onChange }) {
+  return (
+    <label className="jobs-pill">
+      <span className="lbl">{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Todos</option>
+        {options.map((o) => (
+          <option key={o} value={o}>{o}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+function Stars({ rating = 0, compact = false }) {
+  const r = Math.round(Number(rating || 0));
+  const full = "★★★★★".slice(0, r);
+  const empty = "★★★★★".slice(r);
+  return (
+    <span className={`jobs-stars ${compact ? "small" : ""}`} aria-label={`Calificación ${r} de 5`}>
+      <span className="full">{full}</span>
+      <span className="empty">{empty}</span>
+    </span>
+  );
+}
+
+/* ---------- UI: mapa (normaliza dirección) ---------- */
+function normalizeMxAddress(address) {
+  let a = address || "";
+  a = a.replace(/^C\.\s*/i, "Calle ");
+  a = a.replace(/\bS\/N\b/gi, "S/N");
+  if (!/Juárez/i.test(a)) a += ", Ciudad Juárez";
+  if (!/Chihuahua/i.test(a)) a += ", Chihuahua";
+  if (!/México|Mexico/i.test(a)) a += ", México";
+  return a;
+}
+function MapEmbedByAddress({ address, zoom = 16 }) {
+  if (!address) return null;
+  const q = normalizeMxAddress(address);
+  const src = `https://www.google.com/maps?q=${encodeURIComponent(q)}&z=${zoom}&output=embed`;
+  return (
+    <iframe
+      src={src}
+      width="100%"
+      height="280"
+      style={{ border: 0, borderRadius: 12 }}
+      loading="lazy"
+      referrerPolicy="no-referrer-when-downgrade"
+      aria-label="Mapa de ubicación"
+    />
+  );
+}
+
 /* ---------- Página ---------- */
 export default function EstudiantesPage() {
   const router = useRouter();
   const reqSeq = useRef(0);
 
-  // Buscador y filtros
+  // buscador y filtros
   const [q, setQ] = useState("");
+
   const [loc, setLoc] = useState("");
   const [filters, setFilters] = useState({ modalidad: "", comp: "", idioma: "" });
 
-  // Datos
+  // datos
   const [vacancies, setVacancies] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Paginación
+  // paginación
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 20;
   const [hasMore, setHasMore] = useState(true);
 
-  // Usuario, programa, favoritos/ocultas, aplicadas
+  // usuario y flags
   const [userId, setUserId] = useState(null);
   const [studentProgramId, setStudentProgramId] = useState(null);
   const [favIds, setFavIds] = useState([]);
   const [hiddenIds, setHiddenIds] = useState([]);
-  const [appliedVacancyIds, setAppliedVacancyIds] = useState([]); // <<< NUEVO
+  const [appliedVacancyIds, setAppliedVacancyIds] = useState([]);
 
-  /* ----- Boot: usuario + programa + favoritos + ocultas + aplicadas ----- */
+  /* ---------- BD: boot ---------- */
   useEffect(() => {
     let ignore = false;
     const boot = async () => {
@@ -139,7 +228,6 @@ export default function EstudiantesPage() {
       if (!user || ignore) return;
       setUserId(user.id);
 
-      // Programa del alumno
       const { data: profile } = await supabase
         .from("profiles")
         .select("program_id")
@@ -147,16 +235,10 @@ export default function EstudiantesPage() {
         .single();
       if (!ignore) setStudentProgramId(profile?.program_id ?? null);
 
-      // favoritos/ocultas
       const [{ data: favData }, { data: hidData }, { data: appsData }] = await Promise.all([
         supabase.from("vacancy_favorites").select("vacancy_id").eq("student_id", user.id).limit(500),
         supabase.from("vacancy_hidden").select("vacancy_id").eq("student_id", user.id).limit(500),
-        supabase
-          .from("applications")
-          .select("vacancy_id")
-          .eq("student_id", user.id)
-          // con que exista cualquier estado, ya cuenta como postulada
-          .limit(1000),
+        supabase.from("applications").select("vacancy_id").eq("student_id", user.id).limit(1000),
       ]);
 
       if (!ignore && favData) setFavIds(favData.map((x) => x.vacancy_id));
@@ -167,14 +249,13 @@ export default function EstudiantesPage() {
     return () => { ignore = true; };
   }, []);
 
-  /* ----- Carga de vacantes del PROGRAMA (excluye ocultas) ----- */
+  /* ---------- BD: carga de vacantes por programa ---------- */
   useEffect(() => {
     const fetchData = async () => {
       const myId = ++reqSeq.current;
       setLoading(true);
       setErrorMsg("");
 
-      // Si no hay programa, no buscamos (y avisamos)
       if (!studentProgramId) {
         setVacancies([]);
         setSelected(null);
@@ -184,7 +265,6 @@ export default function EstudiantesPage() {
         return;
       }
 
-      // 1) pre-búsqueda de empresas por nombre (si hay q)
       let companyIds = [];
       if (q) {
         const safeQ = String(q).replace(/[%*(),"]/g, " ").trim();
@@ -197,7 +277,6 @@ export default function EstudiantesPage() {
         if (compHits?.length) companyIds = compHits.map((c) => c.id);
       }
 
-      // 2) query base: SOLO vacantes del programa del alumno
       let query = supabase
         .from("vacancies")
         .select(`
@@ -207,11 +286,10 @@ export default function EstudiantesPage() {
           company:companies!left ( id, name, industry, logo_url ),
           vacancy_programs!inner ( program_id )
         `)
-        .eq("status", "active")     // usa tu valor correcto del esquema
-        .gt("spots_left", 0)        // disponibilidad real
-        .eq("vacancy_programs.program_id", studentProgramId); // por programa
+        .in("status", ["activa", "active"])
+        .gt("spots_left", 0)
+        .eq("vacancy_programs.program_id", studentProgramId);
 
-      // 3) texto libre (título/ubicación/empresa)
       if (q) {
         const safe = String(q).replace(/[\*\(\)",]/g, " ").trim();
         const likeStar = `*${safe}*`;
@@ -223,10 +301,8 @@ export default function EstudiantesPage() {
         query = query.or(parts.join(","));
       }
 
-      // 4) locación
       if (loc) query = query.ilike("location_text", `%${loc}%`);
 
-      // 5) filtros exactos
       const dbMod = mapUIToDB_mod(filters.modalidad);
       if (dbMod) query = query.eq("modality", dbMod);
 
@@ -238,13 +314,11 @@ export default function EstudiantesPage() {
 
       if (filters.idioma) query = query.eq("language", filters.idioma);
 
-      // 6) excluir ocultas (UUIDs entre comillas)
       if (hiddenIds.length) {
         const csvHidden = `(${hiddenIds.map(id => `"${id}"`).join(",")})`;
         query = query.not("id", "in", csvHidden);
       }
 
-      // 7) orden + paginación
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
       query = query.order("created_at", { ascending: false }).range(from, to);
@@ -269,7 +343,7 @@ export default function EstudiantesPage() {
     fetchData();
   }, [q, loc, filters, page, hiddenIds, studentProgramId]);
 
-  /* ----- Actions: favoritos / ocultas ----- */
+  /* ---------- BD: acciones favoritos/ocultas ---------- */
   const toggleFavorite = async (vacancyId) => {
     if (!userId) return;
     try {
@@ -323,9 +397,7 @@ export default function EstudiantesPage() {
         setHiddenIds((prev) => [...prev, vacancyId]);
 
         if (selected?.id === vacancyId) {
-          const next = vacancies.find(
-            (v) => v.id !== vacancyId && !hiddenIds.includes(v.id)
-          );
+          const next = vacancies.find((v) => v.id !== vacancyId && !hiddenIds.includes(v.id));
           setSelected(next || null);
         }
       }
@@ -335,28 +407,22 @@ export default function EstudiantesPage() {
     }
   };
 
-  /* ----- Acción: Postularse (desktop) ----- */
+  /* ---------- BD: postularse ---------- */
   const applyNow = async (vacancy) => {
     try {
       if (!userId) { router.push("/login"); return; }
       if (!vacancy?.id) return;
-
-      // evita doble click si ya está postulada
       if (appliedVacancyIds.includes(vacancy.id)) return;
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("applications")
         .insert({
           vacancy_id: vacancy.id,
           student_id: userId,
-          status: "postulada",             // 👈 estado correcto de tu enum
+          status: "postulada",
           applied_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
+        });
       if (error) {
-        // Si hay unique constraint en (student_id, vacancy_id)
         if ((error.code === "23505") || /duplicate key|already exists/i.test(error.message || "")) {
           alert("Ya te habías postulado a esta vacante.");
           setAppliedVacancyIds((prev) => prev.includes(vacancy.id) ? prev : [...prev, vacancy.id]);
@@ -364,7 +430,6 @@ export default function EstudiantesPage() {
         }
         throw error;
       }
-
       setAppliedVacancyIds((prev) => [...prev, vacancy.id]);
       alert("¡Listo! Tu postulación fue enviada.");
     } catch (e) {
@@ -373,14 +438,14 @@ export default function EstudiantesPage() {
     }
   };
 
+  /* ---------- Render ---------- */
   const filtered = useMemo(() => vacancies, [vacancies]);
 
   return (
     <>
       <Navbar />
-
       <main className="jobs-wrap">
-        {/* Buscador principal */}
+        {/* buscador */}
         <div className="jobs-searchbar">
           <div className="jobs-input">
             <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
@@ -396,10 +461,7 @@ export default function EstudiantesPage() {
 
           <div className="jobs-input">
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-              <path
-                fill="currentColor"
-                d="M12 2A7 7 0 0 0 5 9c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"
-              />
+              <path fill="currentColor" d="M12 2A7 7 0 0 0 5 9c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"/>
             </svg>
             <input
               value={loc}
@@ -413,7 +475,7 @@ export default function EstudiantesPage() {
           </button>
         </div>
 
-        {/* Filtros */}
+        {/* filtros */}
         <div className="jobs-filters">
           <Pill
             label="Modalidad"
@@ -435,87 +497,74 @@ export default function EstudiantesPage() {
           />
         </div>
 
-        {/* Grid principal */}
+        {/* grid principal */}
         <section className="jobs-grid">
-          {/* Listado */}
+          {/* listado */}
           <aside className="jobs-listing">
-            {loading && (
-              <>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div className="jobs-card sk" key={i} />
-                ))}
-              </>
-            )}
+            {loading && Array.from({ length: 6 }).map((_, i) => <div className="jobs-card sk" key={i} />)}
 
-            {!loading &&
-              filtered.map((v) => {
-                const isFav = favIds.includes(v.id);
-                const isHidden = hiddenIds.includes(v.id);
-                return (
-                  <button
-                    key={v.id}
-                    className={`jobs-card ${selected?.id === v.id ? "is-active" : ""}`}
-                    onClick={() => {
-                      if (typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches) {
-                        // En móvil, ve al detalle
-                        router.push(`/alumno/vacante/${v.id}`);
-                      } else {
-                        // En desktop, abre en el panel derecho
-                        setSelected(v);
-                      }
-                    }}
-                  >
-                    <div className="jobs-card-left" />
-                    <div className="jobs-card-body">
-                      <div className="jobs-card-top" style={{ justifyContent: "space-between" }}>
-                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                          <LogoSquare src={v.company?.logo_url} />
-                          <div>
-                            <h4 className="jobs-card-title">{v.title}</h4>
-                            <div className="jobs-card-company">{v.company?.name || "Empresa"}</div>
-                            <div className="jobs-card-rating">
-                              <Stars rating={v.rating_avg} compact />
-                              <span className="jobs-muted small">({v.rating_count ?? 0})</span>
-                            </div>
+            {!loading && filtered.map((v) => {
+              const isFav = favIds.includes(v.id);
+              const isHidden = hiddenIds.includes(v.id);
+              return (
+                <button
+                  key={v.id}
+                  className={`jobs-card ${selected?.id === v.id ? "is-active" : ""}`}
+                  onClick={() => {
+                    if (typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches) {
+                      router.push(`/alumno/vacante/${v.id}`);
+                    } else {
+                      setSelected(v);
+                    }
+                  }}
+                >
+                  <div className="jobs-card-left" />
+                  <div className="jobs-card-body">
+                    <div className="jobs-card-top" style={{ justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <LogoSquare src={v.company?.logo_url} name={v.company?.name} />
+                        <div>
+                          <h4 className="jobs-card-title">{v.title}</h4>
+                          <div className="jobs-card-company">{v.company?.name || "Empresa"}</div>
+                          <div className="jobs-card-rating">
+                            <Stars rating={v.rating_avg} compact />
+                            <span className="jobs-muted small">({v.rating_count ?? 0})</span>
                           </div>
                         </div>
-
-                        {/* Acciones (favorito / ocultar) */}
-                        <div className="jobs-card-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          <IconBtn
-                            title={isFav ? "Quitar de favoritos" : "Agregar a favoritos"}
-                            onClick={() => toggleFavorite(v.id)}
-                          >
-                            <IconBookmark active={isFav} />
-                          </IconBtn>
-
-                          <IconBtn
-                            title={isHidden ? "Mostrar esta vacante" : "Ocultar esta vacante"}
-                            onClick={() => toggleHidden(v.id)}
-                          >
-                            <IconBan active={isHidden} />
-                          </IconBtn>
-                        </div>
                       </div>
 
-                      <div className="jobs-meta">
-                        <span>{fmtMod(v.modality)}</span>
-                        <span>{fmtComp(v.compensation)}</span>
-                      </div>
+                      <div className="jobs-card-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <IconBtn
+                          title={isFav ? "Quitar de favoritos" : "Agregar a favoritos"}
+                          onClick={() => toggleFavorite(v.id)}
+                        >
+                          <IconBookmark active={isFav} />
+                        </IconBtn>
 
-                      <div className="jobs-loc-row">
-                        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
-                          <path
-                            fill="currentColor"
-                            d="M12 2A7 7 0 0 0 5 9c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"
-                          />
-                        </svg>
-                        <span className="jobs-muted">{v.location_text || "Ubicación no especificada"}</span>
+                        <IconBtn
+                          title={isHidden ? "Mostrar esta vacante" : "Ocultar esta vacante"}
+                          onClick={() => toggleHidden(v.id)}
+                        >
+                          <IconBan active={isHidden} />
+                        </IconBtn>
                       </div>
                     </div>
-                  </button>
-                );
-              })}
+
+                    <div className="jobs-meta">
+                      <span>{fmtMod(v.modality)}</span>
+                      <span>{fmtComp(v.compensation)}</span>
+                    </div>
+
+                    <div className="jobs-loc-row">
+                      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                        <path fill="currentColor" d="M12 2A7 7 0 0 0 5 9c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"/>
+                      </svg>
+                      <span className="jobs-muted">{v.location_text || "Ubicación no especificada"}</span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
 
             {!loading && hasMore && filtered.length > 0 && (
               <button className="jobs-more" onClick={() => setPage((p) => p + 1)}>
@@ -528,7 +577,7 @@ export default function EstudiantesPage() {
             )}
           </aside>
 
-          {/* Detalle (sticky en desktop) */}
+          {/* detalle */}
           <article className="jobs-detail">
             {loading && <div className="jobs-skeleton">Cargando…</div>}
 
@@ -544,7 +593,10 @@ export default function EstudiantesPage() {
               <div className="jobs-detail-inner">
                 <header className="jobs-detail-head">
                   <div className="jobs-detail-titles">
-                    <h2 className="jobs-title">{selected.title}</h2>
+                    <h2 className="jobs-title" style={{ display:"flex", alignItems:"center", gap:10 }}>
+                      <LogoSquare src={selected.company?.logo_url} name={selected.company?.name} />
+                      {selected.title}
+                    </h2>
                     <a className="jobs-company" href="#" onClick={(e) => e.preventDefault()}>
                       {selected.company?.name || "Empresa"}
                     </a>
@@ -553,29 +605,6 @@ export default function EstudiantesPage() {
                       <span className="jobs-muted">({selected.rating_count ?? 0})</span>
                     </div>
                   </div>
-
-                  {/* Acciones en detalle */}
-                  {(() => {
-                    const isFav = favIds.includes(selected.id);
-                    const isHidden = hiddenIds.includes(selected.id);
-                    return (
-                      <div className="jobs-card-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <IconBtn
-                          title={isFav ? "Quitar de favoritos" : "Agregar a favoritos"}
-                          onClick={() => toggleFavorite(selected.id)}
-                        >
-                          <IconBookmark active={isFav} />
-                        </IconBtn>
-
-                        <IconBtn
-                          title={isHidden ? "Mostrar esta vacante" : "Ocultar esta vacante"}
-                          onClick={() => toggleHidden(selected.id)}
-                        >
-                          <IconBan />
-                        </IconBtn>
-                      </div>
-                    );
-                  })()}
                 </header>
 
                 <div className="jobs-chips">
@@ -586,13 +615,17 @@ export default function EstudiantesPage() {
 
                 <p className="jobs-location">
                   <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
-                    <path
-                      fill="currentColor"
-                      d="M12 2A7 7 0 0 0 5 9c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"
-                    />
+                    <path fill="currentColor" d="M12 2A7 7 0 0 0 5 9c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"/>
                   </svg>
                   {selected.location_text || "Ubicación no especificada"}
                 </p>
+
+                {selected.location_text && (
+                  <section className="jobs-section">
+                    <h3>Ubicación en mapa</h3>
+                    <MapEmbedByAddress address={selected.location_text} />
+                  </section>
+                )}
 
                 <hr className="jobs-sep" />
 
@@ -600,9 +633,7 @@ export default function EstudiantesPage() {
                   <section className="jobs-section">
                     <h3>Actividades</h3>
                     <ul className="jobs-list">
-                      {splitLines(selected.activities).map((t, i) => (
-                        <li key={i}>{t}</li>
-                      ))}
+                      {splitLines(selected.activities).map((t, i) => <li key={i}>{t}</li>)}
                     </ul>
                   </section>
                 )}
@@ -611,15 +642,12 @@ export default function EstudiantesPage() {
                   <section className="jobs-section">
                     <h3>Requisitos</h3>
                     <ul className="jobs-list">
-                      {splitLines(selected.requirements).map((t, i) => (
-                        <li key={i}>{t}</li>
-                      ))}
+                      {splitLines(selected.requirements).map((t, i) => <li key={i}>{t}</li>)}
                     </ul>
                   </section>
                 )}
 
                 <div className="jobs-cta">
-                  {/* En desktop, postula directo */}
                   <button
                     className="jobs-apply"
                     disabled={appliedVacancyIds.includes(selected.id)}
@@ -628,10 +656,6 @@ export default function EstudiantesPage() {
                     {appliedVacancyIds.includes(selected.id) ? "Ya postulada" : "Postularse ahora"}
                   </button>
                 </div>
-
-                <div className="jobs-map">
-                  <img src="/img/mapa_demo.png" alt="Mapa" />
-                </div>
               </div>
             )}
           </article>
@@ -639,55 +663,7 @@ export default function EstudiantesPage() {
 
         {errorMsg && <div className="jobs-error">{errorMsg}</div>}
       </main>
-
       <Footer />
     </>
-  );
-}
-
-/* --------- Helpers / mini componentes ---------- */
-function splitLines(text) {
-  const arr = String(text || "")
-    .split(/\r?\n|•|- /)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return arr.length ? arr : ["No disponible"];
-}
-
-function Pill({ label, value, options = [], onChange }) {
-  return (
-    <label className="jobs-pill">
-      <span className="lbl">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Todos</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function Stars({ rating = 0, compact = false }) {
-  const r = Math.round(Number(rating || 0));
-  const full = "★★★★★".slice(0, r);
-  const empty = "★★★★★".slice(r);
-  return (
-    <span className={`jobs-stars ${compact ? "small" : ""}`} aria-label={`Calificación ${r} de 5`}>
-      <span className="full">{full}</span>
-      <span className="empty">{empty}</span>
-    </span>
-  );
-}
-
-function LogoSquare({ src }) {
-  if (!src) return <div className="jobs-logo-fallback" aria-hidden />;
-  return (
-    <div className="jobs-logo">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" />
-    </div>
   );
 }

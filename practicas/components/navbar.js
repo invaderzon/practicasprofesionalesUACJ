@@ -13,7 +13,7 @@ export default function Navbar() {
     pathname.startsWith("/alumno") ||
     pathname.startsWith("/estudiantes") ||
     pathname.startsWith("/mis-practicas") ||
-    pathname.startsWith("/profesores") ||
+    pathname.startsWith("/docente") ||
     pathname.startsWith("/empresa");
 
   // Home: menú hamburguesa
@@ -114,8 +114,8 @@ export default function Navbar() {
   let tabs = [];
   if (userRole === "professor") {
     tabs = [
-      { href: "/profesores/grupos", label: "MIS GRUPOS" },
-      { href: "/profesores/buscar", label: "BUSCAR" },
+      { href: "/docente/grupos", label: "MIS GRUPOS" },
+      { href: "/docente/buscar", label: "BUSCAR" },
     ];
   } else if (userRole === "company") {
     tabs = [
@@ -228,9 +228,7 @@ function NotificationsBell() {
         .is("read_at", null);
 
       setUnread((unreadRows || []).length);
-
-      // 2) Últimas 20 notificaciones (más recientes primero) — GLOBAL (sin vacancy_id)
-      // 2) Últimas 20 notificaciones (más recientes primero) — SOLO columnas reales
+      
 const { data: list, error } = await supabase
       .from("notifications")
       .select(`

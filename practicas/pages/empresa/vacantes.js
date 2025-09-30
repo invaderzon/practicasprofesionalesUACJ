@@ -5,41 +5,111 @@ import { supabase } from "../../lib/supabaseClient";
 import Navbar from "../../components/navbar";
 import Footer from "../../components/footer";
 
+/* ---------- UI: logo empresa (o iniciales) ---------- */
+function LogoSquare({ src, name }) {
+  const makeInitials = (raw) => {
+    if (typeof raw !== "string") return "?";
+    const cleaned = raw.replace(/\s+/g, " ").trim();
+    if (!cleaned) return "?";
+    const stop = new Set(["de", "del", "la", "las", "el", "los", "the", "of"]);
+    const parts = cleaned.split(" ").filter(Boolean).filter(w => !stop.has(w.toLowerCase()));
+    if (parts.length === 0) return "?";
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+  const initials = makeInitials(name);
+
+  if (src) {
+    return (
+      <div className="jobs-logo" style={{ width: 40, height: 40 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={name || "Logo de la empresa"} />
+      </div>
+    );
+  }
+  return (
+    <div
+      className="jobs-logo-fallback"
+      aria-label={name || "Empresa"}
+      style={{
+        width: 40, height: 40, background: "#e5e7eb", color: "#374151",
+        display: "grid", placeItems: "center", borderRadius: 6, fontWeight: 700
+      }}
+    >
+      <span style={{ fontSize: "0.85rem" }}>{initials}</span>
+    </div>
+  );
+}
+
+/* ---------- UI: utilidades ---------- */
+function splitLines(text) {
+  const arr = String(text || "").split(/\r?\n|•|- /).map(s=>s.trim()).filter(Boolean);
+  return arr.length ? arr : ["No disponible"];
+}
+
+/* ---------- UI: mapa (con normalización de dirección) ---------- */
+function normalizeMxAddress(address) {
+  let a = address || "";
+  a = a.replace(/^C\.\s*/i, "Calle ");
+  a = a.replace(/\bS\/N\b/gi, "S/N");
+  if (!/Juárez/i.test(a)) a += ", Ciudad Juárez";
+  if (!/Chihuahua/i.test(a)) a += ", Chihuahua";
+  if (!/México|Mexico/i.test(a)) a += ", México";
+  return a;
+}
+function MapEmbedByAddress({ address, zoom = 16 }) {
+  if (!address) return null;
+  const q = normalizeMxAddress(address);
+  const src = `https://www.google.com/maps?q=${encodeURIComponent(q)}&z=${zoom}&output=embed`;
+  return (
+    <iframe
+      src={src}
+      width="100%"
+      height="280"
+      style={{ border: 0, borderRadius: 12 }}
+      loading="lazy"
+      referrerPolicy="no-referrer-when-downgrade"
+      aria-label="Mapa de ubicación"
+    />
+  );
+}
+
+/* ---------- Página ---------- */
 export default function EmpresaVacantesPage() {
   const router = useRouter();
 
-  // ------- loading / errores -------
+  /* ---------- UI: loading / errores ---------- */
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // ------- catálogos -------
+  /* ---------- BD: catálogos ---------- */
   const [programs, setPrograms] = useState([]); // [{id,key,name}]
 
-  // ------- empresa y data -------
+  /* ---------- BD: empresa y data ---------- */
   const [company, setCompany] = useState(null);
   const [vacancies, setVacancies] = useState([]); // cada vacante con .program_ids: uuid[]
   const [selected, setSelected] = useState(null);
 
-  // ------- modos del panel derecho (desktop) -------
+  /* ---------- UI: modos panel derecho ---------- */
   const [mode, setMode] = useState("view"); // 'view' | 'edit' | 'apps'
   const [editForm, setEditForm] = useState(null);
 
-  // ------- postulaciones -------
+  /* ---------- BD: postulaciones ---------- */
   const [apps, setApps] = useState([]);
   const [appsLoading, setAppsLoading] = useState(false);
   const [openAppId, setOpenAppId] = useState(null);
   const reqSeq = useRef(0);
 
-  // ------- búsqueda / filtros -------
+  /* ---------- UI: búsqueda / filtros ---------- */
   const [q, setQ] = useState("");
   const [fltEstado, setFltEstado] = useState(""); // "", "activa", "inactiva"
   const [fltCupo, setFltCupo] = useState("");     // "", "con_cupo", "llenas"
 
-  // ------- kebab (sólo panel derecho) -------
+  /* ---------- UI: kebab ---------- */
   const [openMenuDetail, setOpenMenuDetail] = useState(false);
   const pageRef = useRef(null);
 
-  // ================= Helpers generales =================
+  /* ---------- Helpers ---------- */
   const isInactive = (v) => String(v?.status || "").toLowerCase().includes("inactiv");
   const spotsLeft = (v) => Number(v?.spots_left ?? Math.max((v?.spots_total ?? 0) - (v?.spots_taken ?? 0), 0));
   const isFull = (v) => spotsLeft(v) <= 0;
@@ -57,7 +127,7 @@ export default function EmpresaVacantesPage() {
     return arr;
   }, [vacancies, q, fltEstado, fltCupo]);
 
-  // ================= Boot: user -> company -> programs -> vacancies (+program_ids) =================
+  /* ---------- BD: carga inicial ---------- */
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -65,7 +135,6 @@ export default function EmpresaVacantesPage() {
         setLoading(true);
         setErr("");
 
-        // 0) Usuario y rol
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { setErr("No hay sesión."); setLoading(false); return; }
 
@@ -77,7 +146,6 @@ export default function EmpresaVacantesPage() {
           return;
         }
 
-        // 1) Empresa del owner
         const { data: comp, error: cerr } = await supabase
           .from("companies")
           .select("id, name, logo_url, industry, owner_id, status")
@@ -91,7 +159,6 @@ export default function EmpresaVacantesPage() {
         if (ignore) return;
         setCompany(comp);
 
-        // 2) Catálogo de programas
         const { data: progList, error: perr } = await supabase
           .from("programs")
           .select("id, key, name")
@@ -99,7 +166,6 @@ export default function EmpresaVacantesPage() {
         if (perr) throw perr;
         if (!ignore) setPrograms(progList || []);
 
-        // 3) Vacantes de la empresa
         const { data: vacs, error: verr } = await supabase
           .from("vacancies")
           .select(`
@@ -112,7 +178,6 @@ export default function EmpresaVacantesPage() {
 
         let list = vacs || [];
 
-        // 4) Cargar program_ids para todas las vacantes en una sola consulta
         if (list.length) {
           const idsCSV = `(${list.map(v => `"${v.id}"`).join(",")})`;
           const { data: vps } = await supabase
@@ -120,13 +185,12 @@ export default function EmpresaVacantesPage() {
             .select("vacancy_id, program_id")
             .filter("vacancy_id", "in", idsCSV);
 
-          const map = new Map(); // vacancy_id -> program_ids[]
+          const map = new Map();
           (vps || []).forEach(row => {
             const arr = map.get(row.vacancy_id) || [];
             arr.push(row.program_id);
             map.set(row.vacancy_id, arr);
           });
-
           list = list.map(v => ({ ...v, program_ids: map.get(v.id) || [] }));
         }
 
@@ -146,7 +210,7 @@ export default function EmpresaVacantesPage() {
     return () => { ignore = true; };
   }, [router]);
 
-  // ================= Click fuera para cerrar kebab =================
+  /* ---------- UI: click fuera para cerrar kebab ---------- */
   useEffect(() => {
     const onClick = (e) => {
       if (!pageRef.current) return;
@@ -158,7 +222,7 @@ export default function EmpresaVacantesPage() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  // ================= Navegación selección =================
+  /* ---------- UI: selección ---------- */
   const selectDesktop = (v) => {
     setSelected(v);
     setMode("view");
@@ -166,7 +230,6 @@ export default function EmpresaVacantesPage() {
     setOpenAppId(null);
     setOpenMenuDetail(false);
   };
-
   const onSelect = (v) => {
     if (isMobile()) {
       router.push(`/empresa/vacante/${v.id}`);
@@ -175,12 +238,9 @@ export default function EmpresaVacantesPage() {
     selectDesktop(v);
   };
 
-  // ================= Acciones (nueva/editar/apps/estado) =================
+  /* ---------- Acciones (nueva/editar/apps/estado) ---------- */
   const openNew = () => {
-    if (isMobile()) {
-      router.push("/empresa/vacante/nueva");
-      return;
-    }
+    if (isMobile()) { router.push("/empresa/vacante/nueva"); return; }
     const blank = {
       id: null,
       title: "",
@@ -192,7 +252,7 @@ export default function EmpresaVacantesPage() {
       activities: "",
       status: "activa",
       spots_total: 1,
-      program_ids: [], // << programas seleccionados
+      program_ids: [],
     };
     setSelected(null);
     setEditForm(blank);
@@ -202,10 +262,7 @@ export default function EmpresaVacantesPage() {
 
   const beginEditSelected = () => {
     if (!selected) return;
-    if (isMobile()) {
-      router.push(`/empresa/vacante/${selected.id}?edit=1`);
-      return;
-    }
+    if (isMobile()) { router.push(`/empresa/vacante/${selected.id}?edit=1`); return; }
     setEditForm({
       id: selected.id,
       title: selected.title || "",
@@ -217,7 +274,7 @@ export default function EmpresaVacantesPage() {
       activities: selected.activities || "",
       status: selected.status || "activa",
       spots_total: Number(selected.spots_total ?? 1),
-      program_ids: Array.isArray(selected.program_ids) ? [...selected.program_ids] : [], // << cargar actuales
+      program_ids: Array.isArray(selected.program_ids) ? [...selected.program_ids] : [],
     });
     setMode("edit");
     setOpenMenuDetail(false);
@@ -225,10 +282,7 @@ export default function EmpresaVacantesPage() {
 
   const goApps = () => {
     if (!selected) return;
-    if (isMobile()) {
-      router.push(`/empresa/vacante/${selected.id}#postulaciones`);
-      return;
-    }
+    if (isMobile()) { router.push(`/empresa/vacante/${selected.id}#postulaciones`); return; }
     setMode("apps");
     setOpenAppId(null);
     setOpenMenuDetail(false);
@@ -252,7 +306,7 @@ export default function EmpresaVacantesPage() {
     }
   };
 
-  // ================= Guardar/descartar (form) =================
+  /* ---------- Guardar/descartar (form) ---------- */
   const onDiscard = () => {
     if (editForm?.id) {
       const v = vacancies.find(x => x.id === editForm.id);
@@ -264,7 +318,6 @@ export default function EmpresaVacantesPage() {
     }
   };
 
-  // sincroniza vacancy_programs: borra e inserta
   const syncVacancyPrograms = async (vacancyId, programIds = []) => {
     await supabase.from("vacancy_programs").delete().eq("vacancy_id", vacancyId);
     if (programIds.length) {
@@ -281,7 +334,6 @@ export default function EmpresaVacantesPage() {
       if (!f.title?.trim()) { alert("Escribe un título."); return; }
 
       if (f.id) {
-        // update
         const { data, error } = await supabase
           .from("vacancies")
           .update({
@@ -301,17 +353,14 @@ export default function EmpresaVacantesPage() {
           .single();
         if (error) throw error;
 
-        // sync programas
         await syncVacancyPrograms(f.id, f.program_ids || []);
 
-        // refresca UI
         const updated = { ...data, program_ids: [...(f.program_ids || [])] };
         setVacancies(prev => prev.map(v => v.id === f.id ? updated : v));
         setSelected(updated);
         setMode("view");
         setEditForm(null);
       } else {
-        // insert
         const { data: userData } = await supabase.auth.getUser();
         if (!userData?.user || !company) throw new Error("Falta usuario o empresa.");
 
@@ -333,7 +382,6 @@ export default function EmpresaVacantesPage() {
           .single();
         if (error) throw error;
 
-        // sync programas
         await syncVacancyPrograms(data.id, f.program_ids || []);
 
         const newVac = { ...data, program_ids: [...(f.program_ids || [])] };
@@ -346,45 +394,44 @@ export default function EmpresaVacantesPage() {
     }
   };
 
-  // ================= Postulaciones (apps) =================
-useEffect(() => {
-  let ignore = false;
-  const fetchApps = async () => {
-    if (!selected || mode !== "apps") { setApps([]); return; }
-    setAppsLoading(true);
-    const myId = ++reqSeq.current;
+  /* ---------- Postulaciones (apps) ---------- */
+  useEffect(() => {
+    let ignore = false;
+    const fetchApps = async () => {
+      if (!selected || mode !== "apps") { setApps([]); return; }
+      setAppsLoading(true);
+      const myId = ++reqSeq.current;
 
-    const { data, error } = await supabase
-      .from("applications")
-      .select(`
-        id,
-        status,
-        offer_expires_at,
-        decision,
-        decision_at,
-        auto_declined,
-        applied_at,
-        student:profiles ( id, full_name, avatar_url, cv_url, program_id )  -- LEFT JOIN (sin !inner)
-      `)
-      .eq("vacancy_id", selected.id)
-      .in("status", ["postulada","oferta","rechazada","aceptada","retirada"])
-      .order("applied_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("applications")
+        .select(`
+          id,
+          status,
+          offer_expires_at,
+          decision,
+          decision_at,
+          auto_declined,
+          applied_at,
+          student:profiles ( id, full_name, avatar_url, cv_url, program_id )
+        `)
+        .eq("vacancy_id", selected.id)
+        .in("status", ["postulada","oferta","rechazada","aceptada","retirada"])
+        .order("applied_at", { ascending: false });
 
-    if (ignore || myId !== reqSeq.current) return;
+      if (ignore || myId !== reqSeq.current) return;
 
-    if (error) {
-      setErr(error.message);
-      setApps([]);
-    } else {
-      setErr("");
-      setApps(data || []);
-    }
-    setAppsLoading(false);
-  };
-  fetchApps();
-  return () => { ignore = true; };
-}, [selected, mode]);
-
+      if (error) {
+        setErr(error.message);
+        setApps([]);
+      } else {
+        setErr("");
+        setApps(data || []);
+      }
+      setAppsLoading(false);
+    };
+    fetchApps();
+    return () => { ignore = true; };
+  }, [selected, mode]);
 
   const sendOffer = async (appId, days = 5) => {
     try {
@@ -393,24 +440,13 @@ useEffect(() => {
         alert("Esta vacante no tiene cupo disponible o está inactiva.");
         return;
       }
-      // usa RPC si lo tienes
-      const useRPC = true;
-      if (useRPC) {
-        const { error } = await supabase.rpc("company_set_application_status", {
-          p_app_id: appId,
-          p_status: "oferta",
-          p_offer_days: days,
-        });
-        if (error) throw error;
-      } else {
-        const exp = new Date(Date.now() + days * 86400000).toISOString();
-        const { error } = await supabase
-          .from("applications")
-          .update({ status: "oferta", offer_expires_at: exp })
-          .eq("id", appId);
-        if (error) throw error;
-      }
-      // optimistic
+      const { error } = await supabase.rpc("company_set_application_status", {
+        p_app_id: appId,
+        p_status: "oferta",
+        p_offer_days: days,
+      });
+      if (error) throw error;
+
       setApps(prev => prev.map(a => a.id === appId
         ? { ...a, status: "oferta", offer_expires_at: new Date(Date.now() + days * 86400000).toISOString() }
         : a));
@@ -422,21 +458,12 @@ useEffect(() => {
 
   const rejectApp = async (appId) => {
     try {
-      const useRPC = true;
-      if (useRPC) {
-        const { error } = await supabase.rpc("company_set_application_status", {
-          p_app_id: appId,
-          p_status: "rechazada",
-          p_offer_days: 0,
-        });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("applications")
-          .update({ status: "rechazada" })
-          .eq("id", appId);
-        if (error) throw error;
-      }
+      const { error } = await supabase.rpc("company_set_application_status", {
+        p_app_id: appId,
+        p_status: "rechazada",
+        p_offer_days: 0,
+      });
+      if (error) throw error;
       setApps(prev => prev.map(a => a.id === appId ? { ...a, status: "rechazada" } : a));
     } catch (e) {
       console.error(e);
@@ -444,7 +471,7 @@ useEffect(() => {
     }
   };
 
-  // ================= Render =================
+  /* ---------- Render ---------- */
   if (loading) {
     return (
       <>
@@ -454,6 +481,8 @@ useEffect(() => {
       </>
     );
   }
+
+  const companyName = company?.name || "Empresa";
 
   return (
     <>
@@ -465,7 +494,7 @@ useEffect(() => {
           </div>
         )}
 
-        {/* Barra de búsqueda */}
+        {/* ---------- UI: barra superior ---------- */}
         <div className="jobs-searchbar">
           <div className="jobs-input">
             <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
@@ -474,13 +503,10 @@ useEffect(() => {
             </svg>
             <input value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Buscar por título de la vacante" />
           </div>
-          {/* Botón estratégico (acorde a tu estilo) */}
-          <button className="jobs-searchbtn" onClick={openNew} aria-label="Crear nueva vacante">
-            Nueva vacante
-          </button>
+          <button className="jobs-searchbtn" onClick={openNew} aria-label="Crear nueva vacante">Nueva vacante</button>
         </div>
 
-        {/* Filtros */}
+        {/* ---------- UI: filtros ---------- */}
         <div className="jobs-filters">
           <Pill label="Estado" value={fltEstado} onChange={setFltEstado}
             options={["","activa","inactiva"]}
@@ -492,29 +518,42 @@ useEffect(() => {
           />
         </div>
 
+        {/* ---------- UI: grid ---------- */}
         <section className="jobs-grid">
-          {/* Lista de vacantes */}
+          {/* ---------- UI: lista de vacantes ---------- */}
           <aside className="jobs-listing">
-            {filtered.map(v => (
-              <button key={v.id} className={`jobs-card ${selected?.id === v.id ? "is-active" : ""}`} onClick={()=>onSelect(v)}>
+            {filtered.map((v) => (
+              <button
+                key={v.id}
+                className={`jobs-card ${selected?.id === v.id ? "is-active" : ""}`}
+                onClick={() => onSelect(v)}
+              >
+                <div className="jobs-card-left" />
                 <div className="jobs-card-body">
                   <div className="jobs-card-top" style={{ justifyContent:"space-between" }}>
-                    <div>
-                      <h4 className="jobs-card-title" style={{ display:"flex", alignItems:"center", gap:8 }}>
-                        <EstadoDot v={v} />
-                        {v.title}
-                      </h4>
-                      <div className="jobs-meta">
-                        <span>Compensación {v.compensation || "N/A"}</span>
-                        <span>Modalidad {v.modality}</span>
-                      </div>
-                      <div className="jobs-loc-row">
-                        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
-                          <path fill="currentColor" d="M12 2A7 7 0 0 0 5 9c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"/>
-                        </svg>
-                        <span className="jobs-muted">{v.location_text || "Ubicación N/A"}</span>
+                    <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                      <LogoSquare src={company?.logo_url} name={companyName} />
+                      <div>
+                        <h4 className="jobs-card-title" style={{ display:"flex", alignItems:"center", gap:8 }}>
+                          <EstadoDot v={v} />
+                          <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.title}</span>
+                        </h4>
+                        <div className="jobs-card-company">{companyName}</div>
                       </div>
                     </div>
+                    <div style={{ width: 0, height: 0 }} />
+                  </div>
+
+                  <div className="jobs-meta">
+                    <span>Modalidad {v.modality}</span>
+                    <span>Compensación {v.compensation || "N/A"}</span>
+                  </div>
+
+                  <div className="jobs-loc-row">
+                    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                      <path fill="currentColor" d="M12 2A7 7 0 0 0 5 9c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"/>
+                    </svg>
+                    <span className="jobs-muted">{v.location_text || "Ubicación N/A"}</span>
                   </div>
                 </div>
               </button>
@@ -522,23 +561,24 @@ useEffect(() => {
             {!filtered.length && <div className="jobs-empty small">Sin vacantes con esos filtros.</div>}
           </aside>
 
-          {/* Panel derecho */}
+          {/* ---------- UI: panel derecho ---------- */}
           <article className="jobs-detail">
-            {/* VIEW */}
             {mode === "view" && !selected && <div className="jobs-empty">Selecciona una vacante.</div>}
 
             {mode === "view" && selected && (
               <div className="jobs-detail-inner">
                 <header className="jobs-detail-head">
                   <div className="jobs-detail-titles">
-                    <h2 className="jobs-title" style={{ display:"flex", alignItems:"center", gap:8 }}>
-                      <EstadoDot v={selected} /> {selected.title}
+                    <h2 className="jobs-title" style={{ display:"flex", alignItems:"center", gap:10 }}>
+                      <LogoSquare src={company?.logo_url} name={companyName} />
+                      <span style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <EstadoDot v={selected} /> {selected.title}
+                      </span>
                     </h2>
                     <div className="jobs-chips">
                       <span className="jobs-chip">{selected.modality}</span>
                       <span className="jobs-chip">{selected.compensation}</span>
                       <span className="jobs-chip">Idioma {selected.language || "ES"}</span>
-                      {/* Chips de programas */}
                       {selected?.program_ids?.length > 0 && selected.program_ids.map(pid => {
                         const p = programs.find(x => x.id === pid);
                         return <span key={pid} className="jobs-chip">Programa {p?.key || "?"}</span>;
@@ -564,13 +604,11 @@ useEffect(() => {
                         <MenuItem onClick={()=>toggleActive(selected)}>
                           {String(selected.status).toLowerCase().includes("inactiv") ? "Activar vacante" : "Desactivar vacante"}
                         </MenuItem>
-                        <MenuItem onClick={goApps}>Ver postulaciones</MenuItem>
                       </Menu>
                     )}
                   </div>
                 </header>
 
-                {/* Cupo aquí */}
                 <div style={{ display:"flex", gap:8, margin:"4px 0 10px" }}>
                   <div className={`jobs-chip ${isFull(selected) ? "danger" : ""}`}>
                     Cupo: {selected.spots_taken ?? 0}/{selected.spots_total ?? 1}
@@ -591,6 +629,13 @@ useEffect(() => {
                   </section>
                 )}
 
+                {selected.location_text && (
+                  <section className="jobs-section">
+                    <h3>Ubicación en mapa</h3>
+                    <MapEmbedByAddress address={selected.location_text} />
+                  </section>
+                )}
+
                 <div className="jobs-cta" style={{ display:"flex", justifyContent:"flex-end" }}>
                   <button className="jobs-searchbtn" onClick={goApps}>
                     Ver postulaciones
@@ -599,7 +644,6 @@ useEffect(() => {
               </div>
             )}
 
-            {/* EDIT (inline en desktop) */}
             {mode === "edit" && (
               <div className="jobs-detail-inner">
                 <header className="jobs-detail-head">
@@ -693,7 +737,6 @@ useEffect(() => {
                     </label>
                   </div>
 
-                  {/* ====== Programas (multi-select por checkbox) ====== */}
                   <label className="jobs-pill" style={{ gap:8, alignItems:"flex-start" }}>
                     <span className="lbl" style={{ paddingTop:10 }}>Programas</span>
                     <div style={{ display:"grid", gap:6 }}>
@@ -747,7 +790,6 @@ useEffect(() => {
               </div>
             )}
 
-            {/* APPS (inline en desktop) */}
             {mode === "apps" && selected && (
               <div className="jobs-detail-inner">
                 <header className="jobs-detail-head">
@@ -789,7 +831,6 @@ useEffect(() => {
                     })}
                     {!apps.length && <div className="jobs-empty small">Aún no hay postulaciones.</div>}
                   </section>
-
                 )}
               </div>
             )}
@@ -801,7 +842,7 @@ useEffect(() => {
   );
 }
 
-/* ---------- Subcomponentes ---------- */
+/* ---------- UI: subcomponentes ---------- */
 function EstadoDot({ v }) {
   const left = Number(v?.spots_left ?? Math.max((v?.spots_total ?? 0) - (v?.spots_taken ?? 0), 0));
   const inactive = String(v?.status || "").toLowerCase().includes("inactiv");
@@ -852,25 +893,8 @@ function MenuItem({ children, onClick }) {
   );
 }
 
-function AvatarSquare({ src }) {
-  if (!src) return <div className="apps-avatar-fallback" aria-hidden />;
-  return (
-    <div className="apps-avatar">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" />
-    </div>
-  );
-}
-
-function splitLines(text) {
-  const arr = String(text || "").split(/\r?\n|•|- /).map(s=>s.trim()).filter(Boolean);
-  return arr.length ? arr : ["No disponible"];
-}
-
-
 function StudentCard({ app, program, open, onToggle, onSendOffer, onReject, canOffer }) {
   const subtitle = (() => {
-    // Mostramos correo si existiera en tu perfil (si no, el programa o un fallback)
     if (app.student?.email) return app.student.email;
     if (program?.key || program?.name) return `${program?.key ?? ""}${program?.key && program?.name ? " — " : ""}${program?.name ?? ""}`;
     return "Alumno";
@@ -895,7 +919,6 @@ function StudentCard({ app, program, open, onToggle, onSendOffer, onReject, canO
         transition:"box-shadow .2s ease, transform .05s ease",
       }}
     >
-      {/* rail derecho cuando está abierto */}
       {open && (
         <div style={{
           position:"absolute", right:0, top:0, bottom:0, width:6, borderRadius:"0 14px 14px 0",
@@ -903,7 +926,6 @@ function StudentCard({ app, program, open, onToggle, onSendOffer, onReject, canO
         }} />
       )}
 
-      {/* Row compacto (avatar + nombre + menu) */}
       <div style={{ display:"flex", alignItems:"center", gap:12 }}>
         <div style={{ width:44, height:44, borderRadius:999, background:"#eef2f7", overflow:"hidden", flex:"0 0 44px", display:"grid", placeItems:"center" }}>
           {app.student?.avatar_url
@@ -926,10 +948,8 @@ function StudentCard({ app, program, open, onToggle, onSendOffer, onReject, canO
           </div>
         </div>
 
-        {/* estado en chip compacto */}
         <StatusChip status={app.status} />
 
-        {/* caret */}
         <svg
           width="18" height="18" viewBox="0 0 24 24" aria-hidden
           style={{ marginLeft:8, transform: open ? "rotate(180deg)" : "rotate(0)", transition:"transform .15s" }}
@@ -938,7 +958,6 @@ function StudentCard({ app, program, open, onToggle, onSendOffer, onReject, canO
         </svg>
       </div>
 
-      {/* Panel expandible */}
       {open && (
         <div style={{ paddingLeft:56 }}>
           <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:10 }}>
@@ -947,7 +966,6 @@ function StudentCard({ app, program, open, onToggle, onSendOffer, onReject, canO
             {app.offer_expires_at && <InfoPill label="Expira" value={new Date(app.offer_expires_at).toLocaleString()} />}
           </div>
 
-          {/* acciones */}
           <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
             {!!app.student?.cv_url && (
               <a
@@ -1008,7 +1026,6 @@ function timeAgo(iso) {
   return d.toLocaleDateString();
 }
 
-
 function StatusChip({ status }) {
   const map = {
     postulada: { label:"Postulada", bg:"#eef2f7", fg:"#1f3354" },
@@ -1061,7 +1078,6 @@ function btnStyle(variant="primary", disabled=false) {
       cursor:"pointer"
     };
   }
-  // primary
   return {
     padding:"8px 12px", borderRadius:10, border:"1px solid transparent",
     background: disabled ? "#a5b4fc" : "#4f46e5", color:"#fff",

@@ -28,7 +28,7 @@ export default function LoginPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setErr('No se pudo obtener el usuario.'); return; }
 
-    if (isProfesor(email)) return router.replace('/profesores');
+    if (isProfesor(email)) return router.replace('/docente/grupos');
     if (isAlumno(email)) return router.replace('/alumno/buscar');
 
     // Default: empresa

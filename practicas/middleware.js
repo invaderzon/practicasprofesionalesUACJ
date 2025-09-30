@@ -21,7 +21,7 @@ export async function middleware(req) {
   const pathname = req.nextUrl.pathname;
 
   const roleHome = (role) =>
-    role === 'professor' ? '/profesores'
+    role === 'professor' ? '/docente/grupos'
     : role === 'company' ? '/empresa/vacantes'
     : '/alumno/buscar';
 
