@@ -40,6 +40,9 @@ export default function GrupoDetalle() {
   const [students, setStudents] = useState([]);
   const [active, setActive] = useState(null);
 
+  // programas (para mapear id -> nombre)
+  const [programs, setPrograms] = useState([]);
+
   // ---- Agregar alumno (inline) ----
   const [addingOpen, setAddingOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -49,11 +52,21 @@ export default function GrupoDetalle() {
   const [savingAdd, setSavingAdd] = useState(false);
   const searchSeq = useRef(0);
 
-  // Carga miembros
+  // ---- Menú kebab abierto ----
+  const [openMenuId, setOpenMenuId] = useState(null);
+
+  // Carga inicial: programas + miembros
   useEffect(() => {
     if (!groupId) return;
     const load = async () => {
       setLoading(true); setErr("");
+
+      const { data: progList } = await supabase
+        .from("programs")
+        .select("id, name, key")
+        .order("name", { ascending: true });
+      setPrograms(progList || []);
+
       const { data: members, error } = await supabase
         .from("group_members")
         .select(`
@@ -158,11 +171,33 @@ export default function GrupoDetalle() {
     setAlreadyInGroup(false);
   };
 
+  const removeFromGroup = async (studentId) => {
+    if (!confirm("¿Seguro que deseas eliminar este alumno del grupo?")) return;
+    try {
+      await supabase
+        .from("group_members")
+        .delete()
+        .eq("group_id", groupId)
+        .eq("student_id", studentId);
+      setStudents(students.filter(s => s.id !== studentId));
+      if (active?.id === studentId) setActive(null);
+      setOpenMenuId(null);
+    } catch (e) {
+      alert(e.message || "No se pudo eliminar del grupo.");
+    }
+  };
+
   // Orden: alumno activo primero en la lista (solo visual)
   const ordered = useMemo(() => {
     if (!active) return students;
     return [active, ...students.filter(s => s.id !== active.id)];
   }, [students, active]);
+
+  // Helper: programa nombre
+  const programName = (pid) => {
+    const p = programs.find(x => x.id === pid);
+    return p ? `${p.key} — ${p.name}` : "—";
+  };
 
   return (
     <>
@@ -183,80 +218,74 @@ export default function GrupoDetalle() {
             {/* Botón fijo arriba */}
             <div className="add-sticky">
               {!addingOpen ? (
-                <button className="group-new" onClick={() => setAddingOpen(true)} title="Agregar alumno">
-                  <span className="plus">+</span>
-                </button>
+                <div
+                  className="jobs-card group-new"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setAddingOpen(true)}
+                >
+                  <div className="jobs-card-left" />
+                  <div className="jobs-card-body">
+                    <div className="group-new-inner"><span className="group-new-icon">+</span></div>
+                  </div>
+                  <div style={{ width: 0, height: 0 }} />
+                </div>
               ) : (
-                <div className="add-form">
-                  <h4 className="add-title">Agregar alumno al grupo</h4>
-
-                  {/* Buscador inline */}
-                  <input
-                    className="login-input"
-                    type="text"
-                    placeholder="Nombre o matrícula (correo)"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                  />
-
-                  {/* Resultados tipo lista de tarjetas chicas */}
-                  {results.length > 0 && !candidate && (
-                    <div className="add-results">
-                      {results.map(r => (
-                        <button key={r.id} className="result-item" onClick={() => setCandidate(r)}>
-                          <AvatarCircle src={r.avatar_url} name={r.full_name} size={32} />
-                          <div className="result-texts">
-                            <div className="r-name">{r.full_name}</div>
-                            <div className="r-sub">{r.email}</div>
+                <div className="jobs-card add-form-card is-active">
+                  <div className="jobs-card-left" />
+                  <div className="jobs-card-body">
+                    <h4 className="add-title">Agregar alumno al grupo</h4>
+                    <input
+                      className="login-input"
+                      type="text"
+                      placeholder="Nombre o matrícula (correo)"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                    />
+                    {results.length > 0 && !candidate && (
+                      <div className="add-results">
+                        {results.map((r) => (
+                          <button key={r.id} className="result-item" onClick={() => setCandidate(r)}>
+                            <AvatarCircle src={r.avatar_url} name={r.full_name} size={32} />
+                            <div className="result-texts">
+                              <div className="r-name">{r.full_name}</div>
+                              <div className="r-sub">{r.email}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {candidate && (
+                      <div className="preview-card">
+                        <div className="prev-row">
+                          <AvatarCircle src={candidate.avatar_url} name={candidate.full_name} size={48} />
+                          <div style={{ minWidth: 0 }}>
+                            <div className="prev-name">{candidate.full_name}</div>
+                            <div className="prev-sub">{candidate.email}</div>
+                            {!!candidate.program_id && (
+                              <div className="prev-pill">Programa: {programName(candidate.program_id)}</div>
+                            )}
+                            {!!candidate.cv_url && (
+                              <a href={candidate.cv_url} target="_blank" rel="noreferrer" className="prev-link">Ver CV</a>
+                            )}
                           </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Previsualización seleccionada */}
-                  {candidate && (
-                    <div className="preview-card">
-                      <div className="prev-row">
-                        <AvatarCircle src={candidate.avatar_url} name={candidate.full_name} size={48} />
-                        <div style={{ minWidth: 0 }}>
-                          <div className="prev-name">{candidate.full_name}</div>
-                          <div className="prev-sub">{candidate.email}</div>
-                          {!!candidate.program_id && (
-                            <div className="prev-pill">Programa: {candidate.program_id}</div>
-                          )}
-                          {!!candidate.cv_url && (
-                            <a href={candidate.cv_url} target="_blank" rel="noreferrer" className="prev-link">Ver CV</a>
-                          )}
+                        </div>
+                        {alreadyInGroup && <div className="prev-note">Este alumno ya forma parte de este grupo.</div>}
+                        <div className="prev-actions">
+                          <button className="btn btn-ghost" onClick={onAddDiscard}>Descartar</button>
+                          <button className="btn btn-primary" onClick={onAddConfirm} disabled={savingAdd}>
+                            {savingAdd ? "Guardando…" : "Continuar"}
+                          </button>
                         </div>
                       </div>
-
-                      {alreadyInGroup && (
-                        <div className="prev-note">
-                          Este alumno ya forma parte de este grupo.
-                        </div>
-                      )}
-
-                      <div className="prev-actions">
-                        <button className="btn btn-ghost" onClick={onAddDiscard}>Descartar</button>
-                        <button
-                          className="btn btn-primary"
-                          onClick={onAddConfirm}
-                          disabled={savingAdd}
-                          title={alreadyInGroup ? "Ya pertenece al grupo (se mantendrá)" : "Agregar al grupo"}
-                        >
-                          {savingAdd ? "Guardando…" : "Continuar"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <div style={{ width: 0, height: 0 }} />
                 </div>
               )}
             </div>
 
-            {/* Lista regular */}
-            {loading && <div className="jobs-card sk" />}
-
+            {/* Alumnos */}
             {!loading && ordered.map((s) => (
               <div
                 key={s.id}
@@ -265,22 +294,21 @@ export default function GrupoDetalle() {
               >
                 <div className="jobs-card-left" />
                 <div className="jobs-card-body">
-                  <div className="jobs-card-top" style={{ gap: 10 }}>
-                    <div className="jobs-logo" style={{ borderRadius: "50%" }}>
-                      <AvatarCircle src={s.avatar_url} name={s.full_name} />
-                    </div>
+                  <div className="jobs-card-top">
+                    <div className="jobs-logo"><AvatarCircle src={s.avatar_url} name={s.full_name} /></div>
                     <div>
-                      <h4 className="jobs-card-title" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {s.full_name}
-                      </h4>
-                      <div className="jobs-card-company" style={{ maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {s.email}
-                      </div>
+                      <h4 className="jobs-card-title">{s.full_name}</h4>
+                      <div className="jobs-card-company">{s.email}</div>
                     </div>
                   </div>
                 </div>
-                <div className="grp-kebab">
-                  <button className="grp-kebab-btn" title="Opciones">···</button>
+                <div className="grp-kebab" onClick={(e)=>{e.stopPropagation(); setOpenMenuId(openMenuId === s.id ? null : s.id);}}>
+                  <button className="grp-kebab-btn">···</button>
+                  {openMenuId === s.id && (
+                    <div className="grp-menu">
+                      <button onClick={()=>removeFromGroup(s.id)}>Eliminar del grupo</button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -310,7 +338,7 @@ export default function GrupoDetalle() {
 
                 <div className="jobs-section">
                   <h3>Licenciatura</h3>
-                  <p>{active.program_id || "—"}</p>
+                  <p>{programName(active.program_id)}</p>
 
                   <h3>Currículum vitae</h3>
                   {active.cv_url ? (
@@ -325,7 +353,7 @@ export default function GrupoDetalle() {
                 <hr className="jobs-sep" />
 
                 <div className="jobs-section">
-                  <h3>Estado de prácticas</h3>
+                  <h3>Estado de prácticas:</h3>
                   <p>{active.practices ? "Activo" : "No inscrito"}</p>
                 </div>
 
@@ -333,7 +361,7 @@ export default function GrupoDetalle() {
                   <>
                     <hr className="jobs-sep" />
                     <div className="jobs-section">
-                      <h3>Vacante aceptada</h3>
+                      <h3>Esta empresa está interesada en el estudiante</h3>
                       {active.applications
                         .filter((a) => a.status === "oferta" || a.decision === "accepted")
                         .map((a, idx) => (

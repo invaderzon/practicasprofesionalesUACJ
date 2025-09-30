@@ -1498,3 +1498,54 @@ h1 {
   display:grid; place-items:center;
   font-weight:800;
 }
+
+/* Botón "+" mismo estilo que card */
+.group-new-card .jobs-card-body {
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+}
+.group-new-icon {
+  display: grid;
+  place-items: center;
+  width: 36px; height: 36px;
+  border-radius: 999px;
+  border: 2px solid #cbd5e1;
+  background: transparent;
+  font-weight: 800;
+  font-size: 22px;
+  color: #6b7280;
+}
+
+/* Menú de tres puntitos */
+.grp-kebab { position: relative; }
+.grp-kebab-btn {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: #6b7280;
+}
+.grp-menu {
+  position: absolute;
+  right: 0; top: 24px;
+  background: #fff;
+  border: 1px solid #e6eaf1;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.08);
+  z-index: 10;
+  padding: 6px 0;
+}
+.grp-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+}
+.grp-menu button:hover {
+  background: #f9fafb;
+}
