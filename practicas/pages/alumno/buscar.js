@@ -408,35 +408,37 @@ export default function EstudiantesPage() {
   };
 
   /* ---------- BD: postularse ---------- */
-  const applyNow = async (vacancy) => {
-    try {
-      if (!userId) { router.push("/login"); return; }
-      if (!vacancy?.id) return;
-      if (appliedVacancyIds.includes(vacancy.id)) return;
+  /* ---------- BD: postularse (vía RPC SECURITY DEFINER) ---------- */
+const applyNow = async (vacancy) => {
+  try {
+    if (!userId) { router.push("/login"); return; }
+    if (!vacancy?.id) return;
+    if (appliedVacancyIds.includes(vacancy.id)) return;
 
-      const { error } = await supabase
-        .from("applications")
-        .insert({
-          vacancy_id: vacancy.id,
-          student_id: userId,
-          status: "postulada",
-          applied_at: new Date().toISOString()
-        });
-      if (error) {
-        if ((error.code === "23505") || /duplicate key|already exists/i.test(error.message || "")) {
-          alert("Ya te habías postulado a esta vacante.");
-          setAppliedVacancyIds((prev) => prev.includes(vacancy.id) ? prev : [...prev, vacancy.id]);
-          return;
-        }
-        throw error;
+    // Llama a la función SQL: public.apply_and_notify(uuid)
+    const { error } = await supabase.rpc("apply_and_notify", {
+      p_vacancy_id: vacancy.id,
+    });
+
+    if (error) {
+      // Duplicado (ya postuló antes)
+      if ((error.code === "23505") || /duplicate key|already exists/i.test(error.message || "")) {
+        alert("Ya te habías postulado a esta vacante.");
+        setAppliedVacancyIds((prev) => (prev.includes(vacancy.id) ? prev : [...prev, vacancy.id]));
+        return;
       }
-      setAppliedVacancyIds((prev) => [...prev, vacancy.id]);
-      alert("¡Listo! Tu postulación fue enviada.");
-    } catch (e) {
-      console.error(e);
-      alert(e.message || "No se pudo completar la postulación.");
+      throw error;
     }
-  };
+
+    // Éxito: marca como postulada en UI
+    setAppliedVacancyIds((prev) => [...prev, vacancy.id]);
+    alert("¡Listo! Tu postulación fue enviada.");
+  } catch (e) {
+    console.error(e);
+    alert(e.message || "No se pudo completar la postulación.");
+  }
+};
+
 
   /* ---------- Render ---------- */
   const filtered = useMemo(() => vacancies, [vacancies]);
@@ -620,12 +622,6 @@ export default function EstudiantesPage() {
                   {selected.location_text || "Ubicación no especificada"}
                 </p>
 
-                {selected.location_text && (
-                  <section className="jobs-section">
-                    <h3>Ubicación en mapa</h3>
-                    <MapEmbedByAddress address={selected.location_text} />
-                  </section>
-                )}
 
                 <hr className="jobs-sep" />
 
@@ -644,6 +640,13 @@ export default function EstudiantesPage() {
                     <ul className="jobs-list">
                       {splitLines(selected.requirements).map((t, i) => <li key={i}>{t}</li>)}
                     </ul>
+                  </section>
+                )}
+
+                {selected.location_text && (
+                  <section className="jobs-section">
+                    <h3>Ubicación en mapa</h3>
+                    <MapEmbedByAddress address={selected.location_text} />
                   </section>
                 )}
 

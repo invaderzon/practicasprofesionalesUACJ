@@ -7,7 +7,7 @@ import { supabase } from "../../lib/supabaseClient";
 
 const BUCKET_LOGOS = "logos";
 
-export default function EmpresaPerfilPage(){
+export default function EmpresaPerfilPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -20,9 +20,15 @@ export default function EmpresaPerfilPage(){
   const [company, setCompany] = useState(null);
 
   const [kpi, setKpi] = useState({ vacTotal: 0, vacActivas: 0, postulaciones: 0 });
+  const [recentApps, setRecentApps] = useState([]); // 🔹 últimas postulaciones
 
   const [form, setForm] = useState({
-    name: "", industry: "", website: "", description: "", logo_url: "", location_text: ""
+    name: "",
+    industry: "",
+    website: "",
+    description: "",
+    logo_url: "",
+    location_text: "",
   });
 
   const isActive = (s) => {
@@ -34,20 +40,27 @@ export default function EmpresaPerfilPage(){
     let ignore = false;
     (async () => {
       try {
-        setLoading(true); setErr("");
+        setLoading(true);
+        setErr("");
 
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.replace("/login"); return; }
+        if (!user) {
+          router.replace("/login");
+          return;
+        }
         setUserEmail(user.email || "");
 
         const { data: profile } = await supabase
-          .from("profiles").select("role").eq("id", user.id).single();
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
         if ((profile?.role ?? "student") !== "company") {
           router.replace("/alumno/buscar");
           return;
         }
 
-        // Empresa del owner (columnas válidas)
+        // Empresa
         const { data: comp, error: cerr } = await supabase
           .from("companies")
           .select(`
@@ -70,15 +83,15 @@ export default function EmpresaPerfilPage(){
           .from("vacancies")
           .select("id, status, created_at")
           .eq("company_id", comp.id)
-          .order("created_at", { ascending:false });
+          .order("created_at", { ascending: false });
 
         const vacList = vacs || [];
         const vacTotal = vacList.length;
-        const vacActivas = vacList.filter(v => isActive(v.status)).length;
+        const vacActivas = vacList.filter((v) => isActive(v.status)).length;
 
         let postulaciones = 0;
         if (vacList.length) {
-          const idsCSV = `(${vacList.map(v => `"${v.id}"`).join(",")})`;
+          const idsCSV = `(${vacList.map((v) => `"${v.id}"`).join(",")})`;
           const { count } = await supabase
             .from("applications")
             .select("id", { head: true, count: "exact" })
@@ -87,29 +100,53 @@ export default function EmpresaPerfilPage(){
         }
         if (!ignore) setKpi({ vacTotal, vacActivas, postulaciones });
 
+        // 🔹 Últimas postulaciones (máx. 5)
+        if (vacList.length) {
+          const { data: apps } = await supabase
+            .from("applications")
+            .select(`
+              id,
+              applied_at,
+              student:profiles ( id, full_name, avatar_url ),
+              vacancy:vacancies ( id, title )
+            `)
+            .in("vacancy_id", vacList.map((v) => v.id))
+            .order("applied_at", { ascending: false })
+            .limit(5);
+
+          if (!ignore) setRecentApps(apps || []);
+        }
+
         setForm({
           name: comp.name || "",
           industry: comp.industry || "",
           website: comp.website || "",
           description: comp.description || "",
           logo_url: comp.logo_url || "",
-          location_text: comp.location_text || ""
+          location_text: comp.location_text || "",
         });
 
         setLoading(false);
       } catch (e) {
         console.error(e);
-        if (!ignore) { setErr(e.message || "Error cargando tu panel."); setLoading(false); }
+        if (!ignore) {
+          setErr(e.message || "Error cargando tu panel.");
+          setLoading(false);
+        }
       }
     })();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [router]);
 
   const initials = useMemo(() => {
     const n = (company?.name || form.name || "").trim();
     if (!n) return "EMP";
     const parts = n.split(/\s+/);
-    return (parts[0]?.[0] || "E").toUpperCase() + (parts[1]?.[0] || "M").toUpperCase();
+    return (
+      (parts[0]?.[0] || "E").toUpperCase() + (parts[1]?.[0] || "M").toUpperCase()
+    );
   }, [company?.name, form.name]);
 
   const startEdit = () => {
@@ -120,7 +157,7 @@ export default function EmpresaPerfilPage(){
       website: company.website || "",
       description: company.description || "",
       logo_url: company.logo_url || "",
-      location_text: company.location_text || ""
+      location_text: company.location_text || "",
     });
     setMode("edit");
   };
@@ -134,7 +171,7 @@ export default function EmpresaPerfilPage(){
         website: company.website || "",
         description: company.description || "",
         logo_url: company.logo_url || "",
-        location_text: company.location_text || ""
+        location_text: company.location_text || "",
       });
     }
   };
@@ -152,9 +189,12 @@ export default function EmpresaPerfilPage(){
         location_text: form.location_text || "",
         updated_at: new Date().toISOString(),
       };
-      const { error } = await supabase.from("companies").update(payload).eq("id", company.id);
+      const { error } = await supabase
+        .from("companies")
+        .update(payload)
+        .eq("id", company.id);
       if (error) throw error;
-      setCompany(c => ({ ...c, ...payload }));
+      setCompany((c) => ({ ...c, ...payload }));
       setMode("view");
     } catch (e2) {
       alert(e2.message || "No se pudo guardar.");
@@ -169,11 +209,13 @@ export default function EmpresaPerfilPage(){
       setUploading(true);
       const ext = file.name.split(".").pop();
       const path = `company-logos/${company.id}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from(BUCKET_LOGOS).upload(path, file, { upsert: false });
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET_LOGOS)
+        .upload(path, file, { upsert: false });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from(BUCKET_LOGOS).getPublicUrl(path);
       const publicUrl = pub?.publicUrl || "";
-      setForm(f => ({ ...f, logo_url: publicUrl }));
+      setForm((f) => ({ ...f, logo_url: publicUrl }));
     } catch (e2) {
       alert(e2.message || "No se pudo subir la imagen.");
     } finally {
@@ -209,17 +251,84 @@ export default function EmpresaPerfilPage(){
               </div>
             </section>
 
+            {/* 🔹 Últimas postulaciones */}
+            <section className="panel-card" style={{ marginTop: 20 }}>
+              <h3 className="settings-title" style={{ margin: 0, marginBottom: 10 }}>
+                Últimas postulaciones
+              </h3>
+              {recentApps.length > 0 ? (
+                <ul className="jobs-list" style={{ display: "grid", gap: 10 }}>
+                  {recentApps.map((app) => (
+                    <li
+                      key={app.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "6px 0",
+                        borderBottom: "1px solid #f3f4f6",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          overflow: "hidden",
+                          background: "#e5e7eb",
+                          display: "grid",
+                          placeItems: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {app.student?.avatar_url ? (
+                          <img
+                            src={app.student.avatar_url}
+                            alt={app.student.full_name || "Alumno"}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 12, color: "#6b7280" }}>
+                            {(app.student?.full_name || "A")[0]}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600 }}>
+                          {app.student?.full_name || "Alumno"}
+                        </div>
+                        <div style={{ fontSize: 13, color: "#6b7280" }}>
+                          se postuló a <em>{app.vacancy?.title || "Vacante"}</em>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#9ca3af" }}>
+                        {new Date(app.applied_at).toLocaleDateString()}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="jobs-empty small">
+                  No hay postulaciones recientes.
+                </div>
+              )}
+            </section>
+
             {/* Grid principal */}
             <div className="profile-grid">
               {/* Panel de perfil */}
               <section className="panel-card">
                 <div className="section-title-row">
-                  <h2 className="settings-title" style={{ margin: 0 }}>Perfil de empresa</h2>
+                  <h2 className="settings-title" style={{ margin: 0 }}>
+                    Perfil de empresa
+                  </h2>
 
-                  {/* Acciones del modo (solo aquí para evitar duplicados) */}
                   {mode === "view" ? (
                     <div className="actions-row">
-                      <button className="btn btn-ghost" onClick={() => router.push("/empresa/vacantes")}>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => router.push("/empresa/vacantes")}
+                      >
                         Ver vacantes
                       </button>
                       <button className="btn btn-primary" onClick={startEdit}>
@@ -228,36 +337,66 @@ export default function EmpresaPerfilPage(){
                     </div>
                   ) : (
                     <div className="actions-row">
-                      <button className="btn btn-ghost" onClick={cancelEdit}>Descartar</button>
-                      <button className="btn btn-primary" onClick={saveChanges}>Guardar cambios</button>
+                      <button className="btn btn-ghost" onClick={cancelEdit}>
+                        Descartar
+                      </button>
+                      <button className="btn btn-primary" onClick={saveChanges}>
+                        Guardar cambios
+                      </button>
                     </div>
                   )}
                 </div>
 
                 {/* Logo + uploader */}
-                <div className="avatar-uploader" style={{ marginBottom: 12, alignItems: "flex-start" }}>
+                <div
+                  className="avatar-uploader"
+                  style={{ marginBottom: 12, alignItems: "flex-start" }}
+                >
                   <div className="avatar-box" aria-label="Logo de la empresa">
-                    {(mode === "edit" ? form.logo_url : company.logo_url)
-                      ? <img src={(mode === "edit" ? form.logo_url : company.logo_url)} alt="" />
-                      : (
-                        <div style={{
-                          width:"100%", height:"100%", display:"grid", placeItems:"center",
-                          background:"#eef2f7", color:"#1f2937", fontWeight:800, fontSize:18
-                        }}>
-                          {initials}
-                        </div>
-                      )
-                    }
+                    {(mode === "edit" ? form.logo_url : company.logo_url) ? (
+                      <img
+                        src={mode === "edit" ? form.logo_url : company.logo_url}
+                        alt=""
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          display: "grid",
+                          placeItems: "center",
+                          background: "#eef2f7",
+                          color: "#1f2937",
+                          fontWeight: 800,
+                          fontSize: 18,
+                        }}
+                      >
+                        {initials}
+                      </div>
+                    )}
                   </div>
 
                   {mode === "edit" && (
-                    <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                      <input ref={fileInput} type="file" accept="image/*" className="file-hidden" onChange={onFileChange} />
-                      <button className="btn btn-ghost" onClick={pickFile} disabled={uploading}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        ref={fileInput}
+                        type="file"
+                        accept="image/*"
+                        className="file-hidden"
+                        onChange={onFileChange}
+                      />
+                      <button
+                        className="btn btn-ghost"
+                        onClick={pickFile}
+                        disabled={uploading}
+                      >
                         {uploading ? "Subiendo…" : "Cambiar logo"}
                       </button>
                       {form.logo_url && (
-                        <button className="btn btn-danger" onClick={() => setForm(f => ({ ...f, logo_url: "" }))}>
+                        <button
+                          className="btn btn-danger"
+                          onClick={() => setForm((f) => ({ ...f, logo_url: "" }))}
+                        >
                           Quitar logo
                         </button>
                       )}
@@ -265,14 +404,23 @@ export default function EmpresaPerfilPage(){
                   )}
                 </div>
 
-                {/* Vista / Edición */}
                 {mode === "view" ? (
                   <div className="settings-grid">
-                    <Field label="Nombre comercial"><Read>{company.name || "—"}</Read></Field>
-                    <Field label="Industria"><Read>{company.industry || "—"}</Read></Field>
-                    <Field label="Sitio web"><Read>{company.website || "—"}</Read></Field>
-                    <Field label="Correo de contacto"><Read>{readonlyEmail}</Read></Field>
-                    <Field label="Ubicación (oficina principal)"><Read>{company.location_text || "—"}</Read></Field>
+                    <Field label="Nombre comercial">
+                      <Read>{company.name || "—"}</Read>
+                    </Field>
+                    <Field label="Industria">
+                      <Read>{company.industry || "—"}</Read>
+                    </Field>
+                    <Field label="Sitio web">
+                      <Read>{company.website || "—"}</Read>
+                    </Field>
+                    <Field label="Correo de contacto">
+                      <Read>{readonlyEmail}</Read>
+                    </Field>
+                    <Field label="Ubicación (oficina principal)">
+                      <Read>{company.location_text || "—"}</Read>
+                    </Field>
                     <Field label="Descripción" full>
                       <Read multiline>{company.description || "—"}</Read>
                     </Field>
@@ -280,49 +428,96 @@ export default function EmpresaPerfilPage(){
                 ) : (
                   <form onSubmit={saveChanges} className="settings-grid">
                     <Field label="Nombre comercial">
-                      <input className="login-input" value={form.name} onChange={e=>setForm(f=>({...f, name:e.target.value}))} placeholder="p. ej. ACME S.A. de C.V." />
+                      <input
+                        className="login-input"
+                        value={form.name}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, name: e.target.value }))
+                        }
+                        placeholder="p. ej. ACME S.A. de C.V."
+                      />
                     </Field>
                     <Field label="Industria">
-                      <input className="login-input" value={form.industry} onChange={e=>setForm(f=>({...f, industry:e.target.value}))} placeholder="p. ej. Software, Manufactura..." />
+                      <input
+                        className="login-input"
+                        value={form.industry}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, industry: e.target.value }))
+                        }
+                        placeholder="p. ej. Software, Manufactura..."
+                      />
                     </Field>
                     <Field label="Sitio web">
-                      <input className="login-input" value={form.website} onChange={e=>setForm(f=>({...f, website:e.target.value}))} placeholder="https://tu-sitio.com" />
+                      <input
+                        className="login-input"
+                        value={form.website}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, website: e.target.value }))
+                        }
+                        placeholder="https://tu-sitio.com"
+                      />
                     </Field>
                     <Field label="Correo de contacto">
                       <Read>{readonlyEmail}</Read>
                     </Field>
                     <Field label="Ubicación (oficina principal)">
-                      <input className="login-input" value={form.location_text} onChange={e=>setForm(f=>({...f, location_text:e.target.value}))} placeholder="Ciudad, Estado / Dirección corta" />
+                      <input
+                        className="login-input"
+                        value={form.location_text}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, location_text: e.target.value }))
+                        }
+                        placeholder="Ciudad, Estado / Dirección corta"
+                      />
                     </Field>
                     <Field label="Descripción" full>
-                      <textarea className="login-input" rows={4} value={form.description} onChange={e=>setForm(f=>({...f, description:e.target.value}))} placeholder="Cuenta a los alumnos quiénes son, cultura, beneficios, etc." />
+                      <textarea
+                        className="login-input"
+                        rows={4}
+                        value={form.description}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, description: e.target.value }))
+                        }
+                        placeholder="Cuenta a los alumnos quiénes son, cultura, beneficios, etc."
+                      />
                     </Field>
-
-                    {/* 🔹 Ya NO hay botones de guardar aquí para evitar duplicados.
-                        Se quedan en el encabezado. */}
                   </form>
                 )}
               </section>
 
-              {/* Acciones (aparte y con aire) */}
+              {/* Acciones */}
               <aside className="panel-card panel-actions">
                 <div className="section-title-row">
-                  <h3 className="settings-title" style={{ fontSize:18, margin:0 }}>Acciones</h3>
+                  <h3 className="settings-title" style={{ fontSize: 18, margin: 0 }}>
+                    Acciones
+                  </h3>
                 </div>
-                <div style={{ display:"grid", gap:10 }}>
-                  <button className="btn btn-primary" onClick={()=>router.push("/empresa/vacante/nueva")}>
+                <div style={{ display: "grid", gap: 10 }}>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => router.push("/empresa/vacante/nueva")}
+                  >
                     Publicar nueva vacante
                   </button>
-                  <button className="btn btn-ghost" onClick={()=>router.push("/empresa/vacantes")}>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => router.push("/empresa/vacantes")}
+                  >
                     Gestionar mis vacantes
                   </button>
                 </div>
 
                 <div className="tips-box">
                   <div className="tips-title">Tips</div>
-                  <ul className="jobs-list" style={{ marginTop:6 }}>
-                    <li>Mantén tu perfil actualizado: logo, industria y descripción atractiva.</li>
-                    <li>Publica vacantes con actividades y requisitos claros para mejorar el match.</li>
+                  <ul className="jobs-list" style={{ marginTop: 6 }}>
+                    <li>
+                      Mantén tu perfil actualizado: logo, industria y descripción
+                      atractiva.
+                    </li>
+                    <li>
+                      Publica vacantes con actividades y requisitos claros para mejorar
+                      el match.
+                    </li>
                   </ul>
                 </div>
               </aside>
@@ -338,15 +533,26 @@ export default function EmpresaPerfilPage(){
 /* —— Mini componentes de layout —— */
 function Field({ label, full, children }) {
   return (
-    <div style={{ display:"grid", gap:6, gridColumn: full ? "1 / -1" : undefined }}>
-      <div style={{ fontSize:12, fontWeight:700, color:"#1f2937" }}>{label}</div>
+    <div
+      style={{
+        display: "grid",
+        gap: 6,
+        gridColumn: full ? "1 / -1" : undefined,
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#1f2937" }}>
+        {label}
+      </div>
       {children}
     </div>
   );
 }
 function Read({ children, multiline }) {
   return (
-    <div className="readonly-value" style={multiline ? { whiteSpace:"pre-wrap" } : undefined}>
+    <div
+      className="readonly-value"
+      style={multiline ? { whiteSpace: "pre-wrap" } : undefined}
+    >
       {children}
     </div>
   );

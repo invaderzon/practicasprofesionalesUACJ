@@ -434,27 +434,37 @@ export default function EmpresaVacantesPage() {
   }, [selected, mode]);
 
   const sendOffer = async (appId, days = 5) => {
-    try {
-      if (!selected) return;
-      if (isInactive(selected) || isFull(selected)) {
-        alert("Esta vacante no tiene cupo disponible o está inactiva.");
-        return;
-      }
-      const { error } = await supabase.rpc("company_set_application_status", {
-        p_app_id: appId,
-        p_status: "oferta",
-        p_offer_days: days,
-      });
-      if (error) throw error;
-
-      setApps(prev => prev.map(a => a.id === appId
-        ? { ...a, status: "oferta", offer_expires_at: new Date(Date.now() + days * 86400000).toISOString() }
-        : a));
-    } catch (e) {
-      console.error(e);
-      alert(e.message || "No se pudo marcar como oferta.");
+  try {
+    if (!selected) return;
+    if (isInactive(selected) || isFull(selected)) {
+      alert("Esta vacante no tiene cupo disponible o está inactiva.");
+      return;
     }
-  };
+
+    // NUEVO: llama a la RPC que acepta y notifica
+    const { error } = await supabase.rpc("company_accept_application", {
+      p_application_id: appId,
+      p_offer_note: null,    // opcional: un texto que verá el alumno
+      p_days_to_expire: days // opcional: días para que expire la oferta (int)
+    });
+    if (error) throw error;
+
+    // UI local
+    setApps(prev => prev.map(a =>
+      a.id === appId
+        ? {
+            ...a,
+            status: "oferta",
+            offer_expires_at: new Date(Date.now() + days * 86400000).toISOString()
+          }
+        : a
+    ));
+  } catch (e) {
+    console.error(e);
+    alert(e.message || "No se pudo marcar como oferta.");
+  }
+};
+
 
   const rejectApp = async (appId) => {
     try {
