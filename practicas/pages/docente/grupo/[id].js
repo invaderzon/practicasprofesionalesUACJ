@@ -40,9 +40,14 @@ export default function GrupoDetalle() {
   const [students, setStudents] = useState([]);
   const [active, setActive] = useState(null);
 
+
+  
   // programas (para mapear id -> nombre)
   const [programs, setPrograms] = useState([]);
 
+  // ---- Búsqueda de alumnos ----
+  const [searchQuery, setSearchQuery] = useState("");
+  
   // ---- Agregar alumno (inline) ----
   const [addingOpen, setAddingOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -74,7 +79,10 @@ export default function GrupoDetalle() {
             id, full_name, email, avatar_url, cv_url, program_id,
             practices(student_id),
             applications(status, decision, vacancy:vacancies (
-              title, modality, activities, company:companies(name)
+              id, title, modality, compensation, language, requirements, activities,
+              location_text, rating_avg, rating_count, status, created_at, company_id,
+              spots_total, spots_taken, spots_left,
+              company:companies ( id, name, industry, logo_url )
             ))
           )
         `)
@@ -89,7 +97,18 @@ export default function GrupoDetalle() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
-  // Buscar alumnos por nombre o matrícula (email)
+  // Filtrar alumnos por búsqueda
+  const filteredStudents = useMemo(() => {
+    if (!searchQuery.trim()) return students;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return students.filter(student => 
+      student.full_name?.toLowerCase().includes(query) ||
+      student.email?.toLowerCase().includes(query)
+    );
+  }, [students, searchQuery]);
+
+  // Buscar alumnos por nombre o matrícula (email) - para agregar
   useEffect(() => {
     let ignore = false;
     const run = async () => {
@@ -130,46 +149,82 @@ export default function GrupoDetalle() {
   }, [candidate?.id, groupId]);
 
   const onAddConfirm = async () => {
-    if (!candidate?.id || !groupId) return;
-    try {
-      setSavingAdd(true);
-      if (!alreadyInGroup) {
-        const { error } = await supabase.from("group_members").insert({
-          group_id: groupId,
-          student_id: candidate.id,
-        });
-        if (error && !String(error.message).includes("duplicate")) throw error;
-      }
-      // refresca listado
-      const { data: members } = await supabase
-        .from("group_members")
-        .select(`student:profiles ( id, full_name, email, avatar_url, cv_url, program_id, practices(student_id), applications(status, decision, vacancy:vacancies(title, modality, activities, company:companies(name))) )`)
-        .eq("group_id", groupId);
+  if (!candidate?.id || !groupId) return;
+  try {
+    setSavingAdd(true);
+    if (!alreadyInGroup) {
+      const { error } = await supabase.from("group_members").insert({
+        group_id: groupId,
+        student_id: candidate.id,
+      });
+      if (error && !String(error.message).includes("duplicate")) throw error;
+    }
+    // refresca listado
+    const { data: members } = await supabase
+      .from("group_members")
+      .select(`student:profiles ( 
+        id, full_name, email, avatar_url, cv_url, program_id, 
+        practices(student_id),
+        applications(status, decision, vacancy:vacancies (
+          id, title, modality, compensation, language, requirements, activities,
+          location_text, rating_avg, rating_count, status, created_at, company_id,
+          spots_total, spots_taken, spots_left,
+          company:companies ( id, name, industry, logo_url )
+        )) 
+      )`)
+      .eq("group_id", groupId);
 
-      const arr = (members || []).map(m => m.student);
-      setStudents(arr);
-      setActive(arr.find(s => s.id === candidate.id) || arr[0] || null);
+    const arr = (members || []).map(m => m.student);
+    setStudents(arr);
+    setActive(arr.find(s => s.id === candidate.id) || arr[0] || null);
 
-      // limpia editor
+    // Animación al cerrar después de agregar
+    const formCard = document.querySelector('.add-form-card');
+    if (formCard) {
+      formCard.classList.add('exiting');
+      setTimeout(() => {
+        setAddingOpen(false);
+        setQuery("");
+        setResults([]);
+        setCandidate(null);
+        setAlreadyInGroup(false);
+      }, 250);
+    } else {
       setAddingOpen(false);
       setQuery("");
       setResults([]);
       setCandidate(null);
       setAlreadyInGroup(false);
-    } catch (e) {
-      alert(e.message || "No se pudo agregar.");
-    } finally {
-      setSavingAdd(false);
     }
-  };
+  } catch (e) {
+    alert(e.message || "No se pudo agregar.");
+  } finally {
+    setSavingAdd(false);
+  }
+};
 
-  const onAddDiscard = () => {
+const onAddDiscard = () => {
+  // Agregar clase de animación de salida
+  const formCard = document.querySelector('.add-form-card');
+  if (formCard) {
+    formCard.classList.add('exiting');
+    
+    // Esperar a que termine la animación antes de limpiar el estado
+    setTimeout(() => {
+      setAddingOpen(false);
+      setQuery("");
+      setResults([]);
+      setCandidate(null);
+      setAlreadyInGroup(false);
+    }, 250);
+  } else {
     setAddingOpen(false);
     setQuery("");
     setResults([]);
     setCandidate(null);
     setAlreadyInGroup(false);
-  };
+  }
+};
 
   const removeFromGroup = async (studentId) => {
     if (!confirm("¿Seguro que deseas eliminar este alumno del grupo?")) return;
@@ -187,16 +242,62 @@ export default function GrupoDetalle() {
     }
   };
 
-  // Orden: alumno activo primero en la lista (solo visual)
-  const ordered = useMemo(() => {
-    if (!active) return students;
-    return [active, ...students.filter(s => s.id !== active.id)];
-  }, [students, active]);
-
   // Helper: programa nombre
   const programName = (pid) => {
     const p = programs.find(x => x.id === pid);
     return p ? `${p.key} — ${p.name}` : "—";
+  };
+
+  // Helper: formatear modalidad
+  const fmtMod = (dbVal) => {
+    const map = { presencial: "Presencial", "híbrido": "Híbrida", remoto: "Remota" };
+    return map[dbVal] ?? dbVal ?? "Modalidad N/A";
+  };
+
+  // Helper: formatear compensación
+  const fmtComp = (dbVal) => {
+    const map = { apoyo_economico: "Apoyo económico", sin_apoyo: "Sin apoyo" };
+    return map[dbVal] ?? dbVal ?? "Compensación N/A";
+  };
+
+  // Helper: dividir líneas de texto
+  const splitLines = (text) => {
+    const arr = String(text || "").split(/\r?\n|•|- /).map((s) => s.trim()).filter(Boolean);
+    return arr.length ? arr : ["No disponible"];
+  };
+
+  // Helper: normalizar dirección para mapa
+  const normalizeMxAddress = (address) => {
+    let a = address || "";
+    a = a.replace(/^C\.\s*/i, "Calle ");
+    a = a.replace(/\bS\/N\b/gi, "S/N");
+    if (!/Juárez/i.test(a)) a += ", Ciudad Juárez";
+    if (!/Chihuahua/i.test(a)) a += ", Chihuahua";
+    if (!/México|Mexico/i.test(a)) a += ", México";
+    return a;
+  };
+
+  // Componente para mostrar mapa
+  const MapEmbedByAddress = ({ address, zoom = 16 }) => {
+    if (!address) return null;
+    const q = normalizeMxAddress(address);
+    const src = `https://www.google.com/maps?q=${encodeURIComponent(q)}&z=${zoom}&output=embed`;
+    return (
+      <iframe
+        src={src}
+        width="100%"
+        height="280"
+        style={{ border: 0, borderRadius: 12 }}
+        loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade"
+        aria-label="Mapa de ubicación"
+      />
+    );
+  };
+
+  // Navegar a detalles de vacante
+  const navigateToVacancy = (vacancyId) => {
+    router.push(`/vacante/${vacancyId}`);
   };
 
   return (
@@ -204,10 +305,16 @@ export default function GrupoDetalle() {
       <Navbar />
 
       <main className="jobs-wrap">
-        {/* Barra superior SIN lupa */}
+        {/* Barra superior CON búsqueda funcional */}
         <div className="jobs-searchbar prof-search" style={{ maxWidth: 640 }}>
-          <div className="jobs-input"><input placeholder="Nombre del alumno" /></div>
-          <button className="jobs-searchbtn" disabled>Buscar</button>
+          <div className="jobs-input">
+            <input 
+              placeholder="Buscar alumno por nombre o email"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <button className="jobs-searchbtn">Buscar</button>
         </div>
 
         {err && <div className="jobs-error">{err}</div>}
@@ -215,32 +322,40 @@ export default function GrupoDetalle() {
         <div className="jobs-grid">
           {/* Lista de alumnos (columna izquierda) */}
           <aside className="jobs-listing" style={{ position: "relative" }}>
+
+
             {/* Botón fijo arriba */}
             <div className="add-sticky">
               {!addingOpen ? (
-                <div
-                  className="jobs-card group-new"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setAddingOpen(true)}
+                <button 
+                  className="group-new" 
+                  onClick={() => setAddingOpen(true)} 
+                  aria-label="Agregar alumno" 
+                  title="Agregar alumno"
                 >
-                  <div className="jobs-card-left" />
-                  <div className="jobs-card-body">
-                    <div className="group-new-inner"><span className="group-new-icon">+</span></div>
-                  </div>
-                  <div style={{ width: 0, height: 0 }} />
-                </div>
+                  <span className="plus">+</span>
+                </button>
               ) : (
                 <div className="jobs-card add-form-card is-active">
                   <div className="jobs-card-left" />
                   <div className="jobs-card-body">
-                    <h4 className="add-title">Agregar alumno al grupo</h4>
+                    <div className="add-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h4 className="add-title">Agregar alumno al grupo</h4>
+                      <button 
+                        className="btn btn-ghost cancel-btn" 
+                        onClick={onAddDiscard}
+                        style={{ padding: '6px 12px', fontSize: '14px' }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
                     <input
                       className="login-input"
                       type="text"
                       placeholder="Nombre o matrícula (correo)"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
+                      autoFocus
                     />
                     {results.length > 0 && !candidate && (
                       <div className="add-results">
@@ -274,7 +389,7 @@ export default function GrupoDetalle() {
                         <div className="prev-actions">
                           <button className="btn btn-ghost" onClick={onAddDiscard}>Descartar</button>
                           <button className="btn btn-primary" onClick={onAddConfirm} disabled={savingAdd}>
-                            {savingAdd ? "Guardando…" : "Continuar"}
+                            {savingAdd ? "Guardando…" : alreadyInGroup ? "Actualizar" : "Agregar"}
                           </button>
                         </div>
                       </div>
@@ -285,8 +400,10 @@ export default function GrupoDetalle() {
               )}
             </div>
 
-            {/* Alumnos */}
-            {!loading && ordered.map((s) => (
+
+
+            {/* Alumnos - MANTIENE ORDEN ORIGINAL */}
+            {!loading && filteredStudents.map((s) => (
               <div
                 key={s.id}
                 className={`jobs-card ${active?.id === s.id ? "is-active" : ""}`}
@@ -313,8 +430,10 @@ export default function GrupoDetalle() {
               </div>
             ))}
 
-            {!loading && !students.length && !addingOpen && (
-              <div className="jobs-empty small">Aún no hay alumnos en este grupo.</div>
+            {!loading && !filteredStudents.length && !addingOpen && (
+              <div className="jobs-empty small">
+                {searchQuery ? "No se encontraron alumnos con ese criterio." : "Aún no hay alumnos en este grupo."}
+              </div>
             )}
           </aside>
 
@@ -357,20 +476,111 @@ export default function GrupoDetalle() {
                   <p>{active.practices ? "Activo" : "No inscrito"}</p>
                 </div>
 
-                {active.applications?.length > 0 && (
+                {/* Vacantes donde el alumno está inscrito */}
+                {active.applications?.filter(app => app.decision === "accepted").length > 0 && (
                   <>
                     <hr className="jobs-sep" />
                     <div className="jobs-section">
-                      <h3>Esta empresa está interesada en el estudiante</h3>
+                      <h3>Práctica actual</h3>
                       {active.applications
-                        .filter((a) => a.status === "oferta" || a.decision === "accepted")
-                        .map((a, idx) => (
-                          <div key={idx} style={{ marginBottom: 12 }}>
-                            <p><strong>{a.vacancy.title}</strong></p>
-                            <p className="jobs-muted">
-                              {a.vacancy.company?.name} · {a.vacancy.modality}
+                        .filter((app) => app.decision === "accepted")
+                        .map((app, idx) => (
+                          <div key={idx} className="vacancy-detail-card" style={{ 
+                            border: '1px solid #e4e7ee', 
+                            borderRadius: '12px', 
+                            padding: '16px', 
+                            marginBottom: '16px',
+                            cursor: 'pointer'
+                          }}
+                          onClick={() => navigateToVacancy(app.vacancy.id)}
+                          >
+                            <h4 style={{ margin: '0 0 8px 0', color: '#1F3354' }}>
+                              {app.vacancy.title}
+                            </h4>
+                            <p className="jobs-muted" style={{ margin: '0 0 12px 0' }}>
+                              {app.vacancy.company?.name} · {fmtMod(app.vacancy.modality)} · {fmtComp(app.vacancy.compensation)}
                             </p>
-                            <p>{a.vacancy.activities}</p>
+                            
+                            {app.vacancy.activities && (
+                              <>
+                                <h5>Actividades:</h5>
+                                <ul className="jobs-list">
+                                  {splitLines(app.vacancy.activities).map((activity, i) => (
+                                    <li key={i}>{activity}</li>
+                                  ))}
+                                </ul>
+                              </>
+                            )}
+
+                            {app.vacancy.requirements && (
+                              <>
+                                <h5>Requisitos:</h5>
+                                <ul className="jobs-list">
+                                  {splitLines(app.vacancy.requirements).map((req, i) => (
+                                    <li key={i}>{req}</li>
+                                  ))}
+                                </ul>
+                              </>
+                            )}
+
+                            {app.vacancy.location_text && (
+                              <>
+                                <h5>Ubicación:</h5>
+                                <p>{app.vacancy.location_text}</p>
+                                <MapEmbedByAddress address={app.vacancy.location_text} />
+                              </>
+                            )}
+
+                            <div className="jobs-chips" style={{ marginTop: '12px' }}>
+                              <span className="jobs-chip">{fmtMod(app.vacancy.modality)}</span>
+                              <span className="jobs-chip">{fmtComp(app.vacancy.compensation)}</span>
+                              <span className="jobs-chip">Idioma {app.vacancy.language || "ES"}</span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Empresas interesadas en el estudiante */}
+                {active.applications?.filter(app => app.status === "oferta" && app.decision !== "accepted").length > 0 && (
+                  <>
+                    <hr className="jobs-sep" />
+                    <div className="jobs-section">
+                      <h3>Empresas interesadas</h3>
+                      {active.applications
+                        .filter((app) => app.status === "oferta" && app.decision !== "accepted")
+                        .map((app, idx) => (
+                          <div 
+                            key={idx} 
+                            className="interested-company-card"
+                            style={{ 
+                              border: '1px solid #e4e7ee',
+                              borderRadius: '8px',
+                              padding: '12px',
+                              marginBottom: '8px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease'
+                            }}
+                            onClick={() => navigateToVacancy(app.vacancy.id)}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#f8fafc';
+                              e.currentTarget.style.borderColor = '#c7d5ff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.borderColor = '#e4e7ee';
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <strong>{app.vacancy.title}</strong>
+                                <p className="jobs-muted" style={{ margin: '4px 0 0 0' }}>
+                                  {app.vacancy.company?.name} · {fmtMod(app.vacancy.modality)}
+                                </p>
+                              </div>
+                              <span style={{ color: '#2563eb', fontSize: '14px' }}>Ver detalles →</span>
+                            </div>
                           </div>
                         ))}
                     </div>

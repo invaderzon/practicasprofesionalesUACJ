@@ -7,6 +7,8 @@
   --color-azul-secundario: #2563eb;
   --color-azul-oscuro: #1f2937;
   --alto-navbar: 64px;
+  --inactive: #c0c8d6;
+  --inactive-contrast: #6870aa;
 }
 
 /* Reset básico y fondo general */
@@ -1387,26 +1389,6 @@ h1 {
 .menu-item:hover{ background:#f7f8fb; }
 .menu-item.danger{ color:#b91c1c; }
 
-.group-new{
-  display:grid; place-items:center;
-  height: 78px;
-  background:#e9ecef;
-  border:1px solid #d9dde5;
-  border-radius:10px;
-  color:#6b7280;
-  cursor:pointer;
-}
-.group-new:hover{ filter: brightness(.98); }
-.group-new .plus{
-  display:inline-grid; place-items:center;
-  width: 36px; height: 36px;
-  border-radius: 999px;
-  background:#ffffff;
-  border: 2px solid #cbd5e1;
-  font-size: 22px; font-weight: 700;
-  line-height: 1;
-}
-
 .group-editor{
   background:#fff; border:1px solid #e4e7ee; border-radius:10px; padding:12px;
   box-shadow: 0 2px 8px rgba(0,0,0,.05);
@@ -1415,7 +1397,10 @@ h1 {
   display:flex; align-items:center; gap:10px; margin-bottom:8px;
 }
 .color-input{
-  width: 42px; height: 36px; border:1px solid #cfd3da; border-radius:8px; padding:0;
+  width: 16px;
+  height: 44px; 
+  border-radius:8px; 
+  padding:0;
 }
 
 
@@ -1490,7 +1475,6 @@ h1 {
 }
 .prev-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
 
-/* Avatar fallback (reutilizable) */
 .alumno-avatar-fallback{
   border-radius:50%;
   background:#e5e7eb;
@@ -1499,7 +1483,6 @@ h1 {
   font-weight:800;
 }
 
-/* Botón "+" mismo estilo que card */
 .group-new-card .jobs-card-body {
   min-height: 72px;
   display: grid;
@@ -1548,4 +1531,63 @@ h1 {
 }
 .grp-menu button:hover {
   background: #f9fafb;
+}
+
+/* Header del formulario de agregar */
+.add-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* ESTILOS ACTUALIZADOS PARA TODOS LOS BOTONES GROUP-NEW */
+.group-new {
+  display: grid;
+  place-items: center;
+  height: 78px;
+  background: var(--inactive);
+  border-radius: 10px;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.group-new:hover {
+  background-color: var(--color-azul-secundario);
+  filter: brightness(0.98);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.group-new .plus {
+  color: var(--inactive-contrast);
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--inactive-contrast);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.group-new:hover .plus {
+  border-color: white;
+  color: white;
+  transform: scale(1.2);
+  border: 1px solid white;
+}
+
+/* Botón cancelar con animación */
+.cancel-btn {
+  transition: all 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background-color: #f8f9fa;
+  transform: translateY(-1px);
 }

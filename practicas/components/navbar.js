@@ -5,6 +5,57 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
+/* ---- Componente Avatar con iniciales ---- */
+function UserAvatar({ src, name, size = 32 }) {
+  if (src) {
+    return (
+      <img 
+        src={src} 
+        alt="Foto de perfil" 
+        style={{ 
+          width: size, 
+          height: size, 
+          borderRadius: '50%', 
+          objectFit: 'cover',
+          display: 'block'
+          
+
+        }} 
+      />
+    );
+  }
+  
+  const initials = (name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "?";
+
+  return (
+    <div 
+      className="user-avatar-fallback" 
+      aria-label="Iniciales"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        backgroundColor: '#E6E7E8',
+        color: '#1F3354',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: size * 0.4,
+        fontWeight: 'bold'
+      }}
+    >
+      {initials}
+    </div>
+  );
+}
+
 export default function Navbar() {
   const router = useRouter();
   const pathname = router.pathname;
@@ -23,7 +74,8 @@ export default function Navbar() {
   // Portal: user info
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
-  const [userRole, setUserRole] = useState(""); // 👈 rol
+  const [userRole, setUserRole] = useState("");
+  const [userAvatar, setUserAvatar] = useState(""); // 👈 Nuevo estado para avatar
   const [userOpen, setUserOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const menuRef = useRef(null);
@@ -31,7 +83,7 @@ export default function Navbar() {
   const [portalMenuOpen, setPortalMenuOpen] = useState(false);
   const togglePortalMenu = () => setPortalMenuOpen((s) => !s);
 
-  // Cargar perfil
+  // Cargar perfil (actualizado para incluir avatar)
   useEffect(() => {
     let ignore = false;
     const loadUser = async () => {
@@ -39,13 +91,14 @@ export default function Navbar() {
       if (!user) return;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("full_name, role")
+        .select("full_name, role, avatar_url")
         .eq("id", user.id)
         .single();
       if (!ignore) {
         if (profile?.full_name) setUserName(profile.full_name);
         setUserEmail(user.email || "");
         setUserRole(profile?.role || "student");
+        setUserAvatar(profile?.avatar_url || "");
       }
     };
     if (isPortal) loadUser();
@@ -101,7 +154,6 @@ export default function Navbar() {
           <span></span><span></span><span></span>
         </div>
         <div className={`nav-links ${menuActive ? "active" : ""}`}>
-
           <Link className="nav-text" href="/login">INICIAR SESIÓN</Link>
         </div>
       </nav>
@@ -110,7 +162,7 @@ export default function Navbar() {
 
   const esActiva = (p) => pathname === p || pathname.startsWith(p + "/");
 
-  // 👇 Tabs dinámicos según rol
+  // Tabs dinámicos según rol
   let tabs = [];
   if (userRole === "professor") {
     tabs = [
@@ -161,7 +213,7 @@ export default function Navbar() {
             <NotificationsBell />
             <button className="btn-usuario" onClick={toggleUser}>
               <span className="usuario-nombre">{userName}</span>
-              <div className="usuario-avatar" aria-hidden />
+              <UserAvatar src={userAvatar} name={userName} size={32} />
               <svg className={`caret ${userOpen ? "abierto" : ""}`} width="14" height="14" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M7 10l5 5 5-5z" />
               </svg>
@@ -169,7 +221,8 @@ export default function Navbar() {
             {(userOpen || closing) && (
               <div ref={menuRef} className={`menu-usuario ${closing ? "cerrando" : (userOpen ? "abierto" : "")}`}>
                 <div className="cuenta">
-                  <div className="avatar" aria-hidden />
+                  {/* 👇 También actualizar el avatar en el menú desplegable */}
+                  <UserAvatar src={userAvatar} name={userName} size={40} />
                   <div className="datos">
                     <span className="nombre">{userName}</span>
                     {userEmail ? <span className="email">{userEmail}</span> : null}
@@ -198,6 +251,7 @@ export default function Navbar() {
     </>
   );
 }
+
 
 
 /* =======================
