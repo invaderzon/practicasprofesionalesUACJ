@@ -6,6 +6,15 @@ import Footer from "../../components/footer";
 
 const DEFAULT_GROUP_COLOR = "#1F3354";
 
+// 👇 Selector de horas (array de horas en formato de 30 minutos)
+const TIME_SLOTS = [
+  "7:00 am", "7:30 am", "8:00 am", "8:30 am", "9:00 am", "9:30 am", 
+  "10:00 am", "10:30 am", "11:00 am", "11:30 am", "12:00 pm", "12:30 pm", 
+  "1:00 pm", "1:30 pm", "2:00 pm", "2:30 pm", "3:00 pm", "3:30 pm", 
+  "4:00 pm", "4:30 pm", "5:00 pm", "5:30 pm", "6:00 pm", "6:30 pm", 
+  "7:00 pm", "7:30 pm"
+];
+
 /* ---- Avatar con iniciales ---- */
 function AvatarCircle({ src, name }) {
   if (src) {
@@ -29,6 +38,45 @@ function AvatarCircle({ src, name }) {
   );
 }
 
+// 👇 Componente Selector de Horas
+function TimeRangeSelector({ startTime, endTime, onStartTimeChange, onEndTimeChange }) {
+  return (
+    <div className="time-range-selector">
+      <div className="time-select-group">
+        <label>Desde:</label>
+        <select 
+          value={startTime} 
+          onChange={(e) => onStartTimeChange(e.target.value)}
+          className="time-select"
+        >
+          <option value="">Selecciona hora</option>
+          {TIME_SLOTS.map((time) => (
+            <option key={`start-${time}`} value={time}>
+              {time}
+            </option>
+          ))}
+        </select>
+      </div>
+      
+      <div className="time-select-group">
+        <label>Hasta:</label>
+        <select 
+          value={endTime} 
+          onChange={(e) => onEndTimeChange(e.target.value)}
+          className="time-select"
+        >
+          <option value="">Selecciona hora</option>
+          {TIME_SLOTS.map((time) => (
+            <option key={`end-${time}`} value={time}>
+              {time}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 export default function ProfesorGruposPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -39,9 +87,18 @@ export default function ProfesorGruposPage() {
   // perfil profesor
   const [profile, setProfile] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [form, setForm] = useState({ institute: "", office: "", office_hours: "" });
+  const [form, setForm] = useState({ 
+    institute: "", 
+    office: "", 
+    office_hours: "",
+    startTime: "", // 👈 Nuevo estado para hora de inicio
+    endTime: ""    // 👈 Nuevo estado para hora de fin
+  });
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // 👇 Lista de institutos
+  const [institutes, setInstitutes] = useState([]);
 
   // grupos
   const [groups, setGroups] = useState([]);
@@ -72,7 +129,14 @@ export default function ProfesorGruposPage() {
       }
       setUser(u);
 
-      // Perfil + instituto (si tienes tabla institutes se intentará el join; si no, sigue el texto libre)
+      // 👇 Cargar lista de institutos
+      const { data: institutesList } = await supabase
+        .from("institutes")
+        .select("id, code, name")
+        .order("name", { ascending: true });
+      setInstitutes(institutesList || []);
+
+      // Perfil + instituto
       const { data: prof } = await supabase
         .from("profiles")
         .select(`
@@ -87,23 +151,37 @@ export default function ProfesorGruposPage() {
         prof?.institute ||
         "";
 
+      // 👇 Parsear horas de office_hours si existen
+      let startTime = "";
+      let endTime = "";
+      if (prof?.office_hours) {
+        const timeMatch = prof.office_hours.match(/(\d{1,2}:\d{2}\s*[ap]m)\s*a\s*(\d{1,2}:\d{2}\s*[ap]m)/i);
+        if (timeMatch) {
+          startTime = timeMatch[1].trim();
+          endTime = timeMatch[2].trim();
+        }
+      }
+
       const profUi = {
         id: prof?.id,
         full_name: prof?.full_name || "Profesor",
         email: u.email || "",
         avatar_url: prof?.avatar_url || "",
         institute: instituteLabel,
+        institute_id: prof?.institute_id || null,
         office: prof?.office || "",
         office_hours: prof?.office_hours || "",
       };
       setProfile(profUi);
       setForm({
-        institute: instituteLabel,
+        institute: prof?.institute_id || "", // 👈 Ahora guardamos el ID
         office: profUi.office,
         office_hours: profUi.office_hours,
+        startTime,
+        endTime
       });
 
-      // Grupos del profesor (sin created_at)
+      // Grupos del profesor
       const { data: gps, error: gErr } = await supabase
         .from("groups")
         .select("id, name, color, term, hidden")
@@ -129,24 +207,17 @@ export default function ProfesorGruposPage() {
     try {
       setSavingProfile(true);
 
-      // intenta mapear a institutes si existe el valor
-      let institute_id = null;
-      const raw = (form.institute || "").trim();
-      if (raw) {
-        const { data: match } = await supabase
-          .from("institutes")
-          .select("id")
-          .or(`code.ilike.${raw},name.ilike.${raw}`)
-          .limit(1)
-          .single();
-        institute_id = match?.id || null;
+      // 👇 Construir el string de horario a partir de las horas seleccionadas
+      let officeHoursValue = "";
+      if (form.startTime && form.endTime) {
+        officeHoursValue = `${form.startTime} a ${form.endTime}`;
       }
 
       const update = {
         office: form.office?.trim() || null,
-        office_hours: form.office_hours?.trim() || null,
-        institute: raw || null,
-        institute_id: institute_id || null,
+        office_hours: officeHoursValue || null,
+        institute: null, // 👈 Ya no usamos el texto libre
+        institute_id: form.institute || null, // 👈 Usamos el ID del instituto
       };
 
       const { error } = await supabase.from("profiles").update(update).eq("id", user.id);
@@ -162,10 +233,23 @@ export default function ProfesorGruposPage() {
   };
 
   const onCancelProfile = () => {
+    // 👇 Restaurar valores originales al cancelar
+    let startTime = "";
+    let endTime = "";
+    if (profile?.office_hours) {
+      const timeMatch = profile.office_hours.match(/(\d{1,2}:\d{2}\s*[ap]m)\s*a\s*(\d{1,2}:\d{2}\s*[ap]m)/i);
+      if (timeMatch) {
+        startTime = timeMatch[1].trim();
+        endTime = timeMatch[2].trim();
+      }
+    }
+
     setForm({
-      institute: profile?.institute || "",
+      institute: profile?.institute_id || "",
       office: profile?.office || "",
       office_hours: profile?.office_hours || "",
+      startTime,
+      endTime
     });
     setEditOpen(false);
   };
@@ -403,18 +487,44 @@ export default function ProfesorGruposPage() {
               </div>
             ) : (
               <div className="prof-edit-form">
-                <input
-                  className="prof-input"
-                  placeholder="Instituto (IADA, IIT, ICSA, ICB, CCU o nombre completo)"
-                  value={form.institute}
-                  onChange={(e) => setForm((s) => ({ ...s, institute: e.target.value }))}
-                />
-                <input
-                  className="prof-input"
-                  placeholder="Horario de atención (ej. 8:00 am a 15:00 pm)."
-                  value={form.office_hours}
-                  onChange={(e) => setForm((s) => ({ ...s, office_hours: e.target.value }))}
-                />
+                {/* 👇 Selector de Instituto */}
+                <div className="form-group">
+                  <label>Instituto:</label>
+                  <select
+                    className="prof-input"
+                    value={form.institute}
+                    onChange={(e) => setForm((s) => ({ ...s, institute: e.target.value }))}
+                  >
+                    <option value="">Selecciona un instituto</option>
+                    {institutes.map((institute) => (
+                      <option key={institute.id} value={institute.id}>
+                        {institute.name} ({institute.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 👇 Selector de Horario */}
+                <div className="form-group">
+                  <label>Horario de atención:</label>
+                  <TimeRangeSelector
+                    startTime={form.startTime}
+                    endTime={form.endTime}
+                    onStartTimeChange={(time) => setForm((s) => ({ ...s, startTime: time }))}
+                    onEndTimeChange={(time) => setForm((s) => ({ ...s, endTime: time }))}
+                  />
+                  {form.startTime && form.endTime && (
+                    <div style={{ 
+                      fontSize: '12px', 
+                      color: '#666', 
+                      marginTop: '4px',
+                      fontStyle: 'italic'
+                    }}>
+                      Horario seleccionado: {form.startTime} a {form.endTime}
+                    </div>
+                  )}
+                </div>
+
                 <input
                   className="prof-input"
                   placeholder="Ubicación de oficina (ej. G-304)"
@@ -464,6 +574,6 @@ export default function ProfesorGruposPage() {
       </main>
 
       <Footer />
-    </>
+          </>
   );
 }

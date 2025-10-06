@@ -306,6 +306,62 @@ export default function EmpresaVacantesPage() {
     }
   };
 
+  /* ---------- Eliminar vacante ---------- */
+  const deleteVacancy = async (vac) => {
+    const ok = confirm(`¿Estás seguro de que quieres ELIMINAR permanentemente la vacante "${vac.title}"? Esta acción no se puede deshacer y también eliminará todas las postulaciones asociadas.`);
+    if (!ok) return;
+    
+    try {
+      // Primero eliminar las postulaciones relacionadas
+      const { error: appsError } = await supabase
+        .from("applications")
+        .delete()
+        .eq("vacancy_id", vac.id);
+      
+      if (appsError) {
+        console.error("Error deleting applications:", appsError);
+        // Continuamos aunque falle, para intentar eliminar la vacante igualmente
+      }
+
+      // Luego eliminar los programas asociados
+      const { error: programsError } = await supabase
+        .from("vacancy_programs")
+        .delete()
+        .eq("vacancy_id", vac.id);
+      
+      if (programsError) {
+        console.error("Error deleting programs:", programsError);
+        // Continuamos aunque falle
+      }
+
+      // Finalmente eliminar la vacante
+      const { error } = await supabase
+        .from("vacancies")
+        .delete()
+        .eq("id", vac.id);
+      
+      if (error) throw error;
+
+      // Actualizar el estado local
+      setVacancies(prev => prev.filter(v => v.id !== vac.id));
+      
+      // Si la vacante eliminada era la seleccionada, limpiar la selección
+      if (selected?.id === vac.id) {
+        setSelected(null);
+        setMode("view");
+      }
+      
+      setOpenMenuDetail(false);
+      
+      // Mostrar mensaje de éxito
+      alert("Vacante eliminada correctamente.");
+      
+    } catch (e) {
+      console.error("Error deleting vacancy:", e);
+      alert(e.message || "No se pudo eliminar la vacante.");
+    }
+  };
+
   /* ---------- Guardar/descartar (form) ---------- */
   const onDiscard = () => {
     if (editForm?.id) {
@@ -614,6 +670,9 @@ export default function EmpresaVacantesPage() {
                         <MenuItem onClick={()=>toggleActive(selected)}>
                           {String(selected.status).toLowerCase().includes("inactiv") ? "Activar vacante" : "Desactivar vacante"}
                         </MenuItem>
+                        <MenuItem onClick={() => deleteVacancy(selected)} danger>
+                          Eliminar vacante
+                        </MenuItem>
                       </Menu>
                     )}
                   </div>
@@ -647,7 +706,7 @@ export default function EmpresaVacantesPage() {
                 )}
 
                 <div className="jobs-cta" style={{ display:"flex", justifyContent:"flex-end" }}>
-                  <button className="jobs-searchbtn" onClick={goApps}>
+                  <button className="jobs-apply" onClick={goApps}>
                     Ver postulaciones
                   </button>
                 </div>
@@ -891,12 +950,23 @@ function Menu({ children }) {
     </div>
   );
 }
-function MenuItem({ children, onClick }) {
+
+function MenuItem({ children, onClick, danger = false }) {
   return (
     <button
       className="jobs-more"
       onClick={onClick}
-      style={{ display:"block", width:"100%", textAlign:"left", padding:"8px 10px", border:"none", background:"transparent", cursor:"pointer" }}
+      style={{ 
+        display: "block", 
+        width: "100%", 
+        textAlign: "left", 
+        padding: "8px 10px", 
+        border: "none", 
+        background: "transparent", 
+        cursor: "pointer",
+        color: danger ? "#dc2626" : "#1f2937",
+        fontWeight: danger ? "600" : "normal"
+      }}
     >
       {children}
     </button>
@@ -986,7 +1056,7 @@ function StudentCard({ app, program, open, onToggle, onSendOffer, onReject, canO
                 onClick={(e)=>e.stopPropagation()}
                 style={btnStyle("ghost")}
               >
-                Ver CV
+                📄 Ver CV
               </a>
             )}
 

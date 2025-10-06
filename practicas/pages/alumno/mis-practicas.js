@@ -19,6 +19,23 @@ function validateExt(ext) {
   if (!ext || ext.includes("/")) throw new Error("Nombre de archivo inválido.");
 }
 
+// Función para obtener iniciales
+const getInitials = (name) => {
+  if (!name) return "E";
+  return name
+    .split(' ')
+    .map(word => word[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+// Función para detectar si es PDF basado en la URL
+const isPdfUrl = (url) => {
+  if (!url) return false;
+  return url.toLowerCase().endsWith('.pdf') || url.includes('.pdf?');
+};
+
 export default function MisPracticasPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -79,6 +96,36 @@ export default function MisPracticasPage() {
         return;
       }
 
+      // 3) Cargar información del grupo y profesor
+      const { data: groupMembers, error: gmErr } = await supabase
+        .from("group_members")
+        .select(`
+          group:groups (
+            id,
+            name,
+            color,
+            professor_id
+          )
+        `)
+        .eq("student_id", u.id)
+        .maybeSingle();
+
+      let groupInfo = null;
+      let professorInfo = null;
+
+      if (groupMembers?.group) {
+        groupInfo = groupMembers.group;
+        
+        // Obtener información del profesor
+        const { data: profData } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .eq("id", groupInfo.professor_id)
+          .single();
+        
+        professorInfo = profData;
+      }
+
       setProfile({
         id: prof.id,
         full_name: prof.full_name || "(Sin nombre)",
@@ -87,9 +134,11 @@ export default function MisPracticasPage() {
         avatar_url: cacheBust(prof.avatar_url || ""),
         cv_url: prof.cv_url || "",
         program: prof.program || null,
+        group: groupInfo,
+        professor: professorInfo
       });
 
-      // 3) Favoritos (vacancy_favorites)
+      // 4) Favoritos (vacancy_favorites)
       const { data: favs, error: fErr } = await supabase
         .from("vacancy_favorites")
         .select(`
@@ -115,7 +164,7 @@ export default function MisPracticasPage() {
         .filter((v) => !!v?.id);
       setFavorites(favVacancies);
 
-      // 4) TODAS las aplicaciones del alumno
+      // 5) TODAS las aplicaciones del alumno
       const { data: apps, error: aErr } = await supabase
         .from("applications")
         .select(`
@@ -137,18 +186,23 @@ export default function MisPracticasPage() {
 
       // Separa postulaciones activas (no "completadas") y completadas
       const appsClean = (apps || []).filter((r) => r?.vacancy?.id);
-      const completedList = appsClean
-        .filter((r) => COMPLETED_STATES.includes(String(r.status || "").toLowerCase()))
+      
+      // Filtrar explícitamente las rechazadas
+      const appliedList = appsClean
+        .filter((r) => {
+          const status = String(r.status || "").toLowerCase();
+          return !COMPLETED_STATES.includes(status) && status !== "rechazada";
+        })
         .map((r) => ({ ...r.vacancy, _app_status: r.status, _applied_at: r.applied_at }));
 
-      const appliedList = appsClean
-        .filter((r) => !COMPLETED_STATES.includes(String(r.status || "").toLowerCase()))
+      const completedList = appsClean
+        .filter((r) => COMPLETED_STATES.includes(String(r.status || "").toLowerCase()))
         .map((r) => ({ ...r.vacancy, _app_status: r.status, _applied_at: r.applied_at }));
 
       setCompleted(completedList);
       setApplied(appliedList);
 
-      // 5) Vacantes silenciadas (vacancy_hidden)
+      // 6) Vacantes silenciadas (vacancy_hidden)
       const { data: hidd, error: hErr } = await supabase
         .from("vacancy_hidden")
         .select(`
@@ -213,7 +267,9 @@ export default function MisPracticasPage() {
 
       if (updErr) throw updErr;
 
-      setProfile((p) => ({ ...p, cv_url: publicUrl }));
+      // Aplicar cache-busting aquí también
+      setProfile((p) => ({ ...p, cv_url: cacheBust(publicUrl) }));
+      bump(); // Forzar recarga para detectar correctamente el tipo de archivo
     } catch (e2) {
       console.error(e2);
       alert(e2.message || "No se pudo subir el CV.");
@@ -357,6 +413,66 @@ export default function MisPracticasPage() {
   const fmtMod = (m) =>
     m === "presencial" ? "Presencial" : m === "remoto" ? "Remota" : "Híbrida";
 
+  // Función para renderizar preview del CV
+  const renderCvPreview = (cvUrl) => {
+    if (!cvUrl) return null;
+    
+    if (isPdfUrl(cvUrl)) {
+      return (
+        <div style={{ 
+          width: "100%", 
+          height: 260, 
+          background: "#f8f9fa",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          border: "1px solid #e9ecef",
+          borderRadius: 8,
+          overflow: "hidden"
+        }}>
+          <iframe
+            src={`${cvUrl}#view=FitH&toolbar=0&navpanes=0`}
+            style={{ 
+              width: "100%", 
+              height: "100%", 
+              border: "none",
+            }}
+            title="Vista previa del CV"
+          />
+          <div style={{ 
+            position: "absolute", 
+            bottom: 8, 
+            left: 0, 
+            right: 0, 
+            textAlign: "center",
+            background: "rgba(255,255,255,0.9)",
+            padding: "4px 8px",
+            fontSize: 12,
+            color: "#6c757d"
+          }}>
+            Documento PDF - Haz clic para ampliar
+          </div>
+        </div>
+      );
+    } else {
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={cvUrl}
+          alt="CV"
+          style={{ 
+            width: "100%", 
+            height: 260, 
+            objectFit: "contain",
+            background: "#f8f9fa",
+            display: "block" 
+          }}
+        />
+      );
+    }
+  };
+
   const Card = ({ v, actions = null, subtitle = null }) => (
     <article className="jobs-card" style={{ cursor: "default" }}>
       <div className="jobs-card-left" />
@@ -366,9 +482,26 @@ export default function MisPracticasPage() {
             <div className="jobs-logo">
               {v?.company?.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={v.company.logo_url} alt="" />
+                <img 
+                  src={v.company.logo_url} 
+                  alt={`Logo de ${v.company.name}`}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
               ) : (
-                <div className="jobs-logo-fallback" aria-hidden />
+                <div 
+                  style={{
+                    width: 40, 
+                    height: 40, 
+                    background: "#e5e7eb", 
+                    color: "#374151",
+                    display: "grid", 
+                    placeItems: "center", 
+                    borderRadius: 6, 
+                    fontWeight: 700
+                  }}
+                >
+                  {getInitials(v?.company?.name)}
+                </div>
               )}
             </div>
             <div>
@@ -518,6 +651,18 @@ export default function MisPracticasPage() {
               <div style={{ marginTop: 10, fontSize: 14, textAlign: "center" }}>
                 <div><strong>Programa:</strong> {profile.program.name}</div>
                 <div className="jobs-muted">({profile.program.key})</div>
+                
+                {/* Información del grupo */}
+                {profile.group && (
+                  <div style={{ marginTop: 8, padding: 8, background: "#f0f7ff", borderRadius: 6 }}>
+                    <div><strong>Grupo:</strong> {profile.group.name}</div>
+                    {profile.professor && (
+                      <div className="jobs-muted">
+                        <strong>Profesor:</strong> {profile.professor.full_name}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -534,24 +679,12 @@ export default function MisPracticasPage() {
                     borderRadius: 8,
                     overflow: "hidden",
                     cursor: "zoom-in",
+                    position: "relative"
                   }}
                   onClick={() => setCvOpen(true)}
                   title="Ver en grande"
                 >
-                  {profile.cv_url.toLowerCase().endsWith(".pdf") ? (
-                    <embed
-                      src={profile.cv_url}
-                      type="application/pdf"
-                      style={{ width: "100%", height: 260, display: "block" }}
-                    />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={profile.cv_url}
-                      alt="CV"
-                      style={{ width: "100%", display: "block", maxHeight: 380, objectFit: "contain" }}
-                    />
-                  )}
+                  {renderCvPreview(profile.cv_url)}
                 </div>
 
                 <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -707,7 +840,7 @@ export default function MisPracticasPage() {
             style={{
               position: "fixed",
               inset: 0,
-              background: "rgba(0,0,0,.6)",
+              background: "rgba(0,0,0,.8)",
               display: "grid",
               placeItems: "center",
               zIndex: 9999,
@@ -719,27 +852,74 @@ export default function MisPracticasPage() {
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: "min(1000px, 96vw)",
-                height: "min(80vh, 90vh)",
+                height: "min(90vh, 95vh)",
                 background: "#fff",
                 borderRadius: 10,
                 overflow: "hidden",
                 boxShadow: "0 10px 30px rgba(0,0,0,.25)",
+                display: "flex",
+                flexDirection: "column",
               }}
             >
-              {profile.cv_url.toLowerCase().endsWith(".pdf") ? (
-                <embed
-                  src={profile.cv_url}
-                  type="application/pdf"
-                  style={{ width: "100%", height: "100%", display: "block" }}
-                />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={profile.cv_url}
-                  alt="CV"
-                  style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
-                />
-              )}
+              {/* Header del modal */}
+              <div style={{
+                padding: "12px 16px",
+                background: "#f8fafc",
+                borderBottom: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}>
+                <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Curriculum Vitae</h3>
+                <button
+                  onClick={() => setCvOpen(false)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    fontSize: "1.5rem",
+                    cursor: "pointer",
+                    color: "#64748b",
+                    padding: 0,
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    display: "grid",
+                    placeItems: "center",
+                  }}
+                  aria-label="Cerrar"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Contenido del CV */}
+              <div style={{ flex: 1, overflow: "auto" }}>
+                {isPdfUrl(profile.cv_url) ? (
+                  <iframe
+                    src={`${profile.cv_url}#view=FitH`}
+                    style={{ 
+                      width: "100%", 
+                      height: "100%", 
+                      border: "none",
+                      minHeight: "500px"
+                    }}
+                    title="CV PDF"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={profile.cv_url}
+                    alt="CV"
+                    style={{ 
+                      width: "100%", 
+                      height: "auto", 
+                      objectFit: "contain", 
+                      display: "block",
+                      maxHeight: "100%"
+                    }}
+                  />
+                )}
+              </div>
             </div>
           </div>
         )}

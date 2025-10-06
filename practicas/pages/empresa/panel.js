@@ -36,6 +36,11 @@ export default function EmpresaPerfilPage() {
     return k.startsWith("activ") && !k.includes("inactiv");
   };
 
+  const handleAppClick = (app) => {
+    // Redirigir a la página de gestión de postulaciones
+    router.push("/empresa/postulaciones");
+  };
+
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -78,7 +83,7 @@ export default function EmpresaPerfilPage() {
         if (ignore) return;
         setCompany(comp);
 
-        // KPIs
+        // KPIs - VERSIÓN OPTIMIZADA
         const { data: vacs } = await supabase
           .from("vacancies")
           .select("id, status, created_at")
@@ -89,33 +94,26 @@ export default function EmpresaPerfilPage() {
         const vacTotal = vacList.length;
         const vacActivas = vacList.filter((v) => isActive(v.status)).length;
 
+        // CONTAR POSTULACIONES - MÉTODO CONFIABLE
         let postulaciones = 0;
-        if (vacList.length) {
-          const idsCSV = `(${vacList.map((v) => `"${v.id}"`).join(",")})`;
-          const { count } = await supabase
+        if (vacList.length > 0) {
+          const vacancyIds = vacList.map(v => v.id);
+          
+          const { data: allApplications, error: appsError } = await supabase
             .from("applications")
-            .select("id", { head: true, count: "exact" })
-            .filter("vacancy_id", "in", idsCSV);
-          postulaciones = count || 0;
+            .select("id, vacancy_id")
+            .in("vacancy_id", vacancyIds);
+          
+          if (!appsError && allApplications) {
+            postulaciones = allApplications.length;
+            console.log("✅ Postulaciones encontradas:", postulaciones);
+          } else {
+            console.error("❌ Error contando postulaciones:", appsError);
+          }
         }
+
         if (!ignore) setKpi({ vacTotal, vacActivas, postulaciones });
-
-        // 🔹 Últimas postulaciones (máx. 5)
-        if (vacList.length) {
-          const { data: apps } = await supabase
-            .from("applications")
-            .select(`
-              id,
-              applied_at,
-              student:profiles ( id, full_name, avatar_url ),
-              vacancy:vacancies ( id, title )
-            `)
-            .in("vacancy_id", vacList.map((v) => v.id))
-            .order("applied_at", { ascending: false })
-            .limit(5);
-
-          if (!ignore) setRecentApps(apps || []);
-        }
+      
 
         setForm({
           name: comp.name || "",
@@ -251,69 +249,6 @@ export default function EmpresaPerfilPage() {
               </div>
             </section>
 
-            {/* 🔹 Últimas postulaciones */}
-            <section className="panel-card" style={{ marginTop: 20 }}>
-              <h3 className="settings-title" style={{ margin: 0, marginBottom: 10 }}>
-                Últimas postulaciones
-              </h3>
-              {recentApps.length > 0 ? (
-                <ul className="jobs-list" style={{ display: "grid", gap: 10 }}>
-                  {recentApps.map((app) => (
-                    <li
-                      key={app.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        padding: "6px 0",
-                        borderBottom: "1px solid #f3f4f6",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          overflow: "hidden",
-                          background: "#e5e7eb",
-                          display: "grid",
-                          placeItems: "center",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {app.student?.avatar_url ? (
-                          <img
-                            src={app.student.avatar_url}
-                            alt={app.student.full_name || "Alumno"}
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          <span style={{ fontSize: 12, color: "#6b7280" }}>
-                            {(app.student?.full_name || "A")[0]}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600 }}>
-                          {app.student?.full_name || "Alumno"}
-                        </div>
-                        <div style={{ fontSize: 13, color: "#6b7280" }}>
-                          se postuló a <em>{app.vacancy?.title || "Vacante"}</em>
-                        </div>
-                      </div>
-                      <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                        {new Date(app.applied_at).toLocaleDateString()}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="jobs-empty small">
-                  No hay postulaciones recientes.
-                </div>
-              )}
-            </section>
-
             {/* Grid principal */}
             <div className="profile-grid">
               {/* Panel de perfil */}
@@ -325,12 +260,6 @@ export default function EmpresaPerfilPage() {
 
                   {mode === "view" ? (
                     <div className="actions-row">
-                      <button
-                        className="btn btn-ghost"
-                        onClick={() => router.push("/empresa/vacantes")}
-                      >
-                        Ver vacantes
-                      </button>
                       <button className="btn btn-primary" onClick={startEdit}>
                         Editar
                       </button>
@@ -504,6 +433,12 @@ export default function EmpresaPerfilPage() {
                     onClick={() => router.push("/empresa/vacantes")}
                   >
                     Gestionar mis vacantes
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => router.push("/empresa/postulaciones")}
+                  >
+                    Ver todas las postulaciones
                   </button>
                 </div>
 

@@ -8,180 +8,397 @@ import { supabase } from "../../../lib/supabaseClient";
 export default function NuevaVacantePage() {
   const router = useRouter();
   const [company, setCompany] = useState(null);
-  const [programs, setPrograms] = useState([]);        // catálogo
-  const [programIds, setProgramIds] = useState([]);    // selección
+  const [programs, setPrograms] = useState([]);
+  const [programIds, setProgramIds] = useState([]);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
-    title:"", modality:"presencial", compensation:"Apoyo económico", language:"ES",
-    location_text:"", requirements:"", activities:"", status:"activa", spots_total:1
+    title: "",
+    modality: "presencial",
+    compensation: "Apoyo económico", 
+    language: "ES",
+    location_text: "",
+    requirements: "",
+    activities: "",
+    status: "activa",
+    spots_total: 1
   });
 
   useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.replace("/login"); return; }
+    let mounted = true;
+    
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          if (mounted) router.replace("/login");
+          return;
+        }
 
-      const [{ data: comp }, { data: progList }] = await Promise.all([
-        supabase.from("companies").select("id,name").eq("owner_id", user.id).single(),
-        supabase.from("programs").select("id,key,name").order("name", { ascending: true })
-      ]);
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
 
-      if (!comp) { setErr("Crea tu ficha de empresa primero."); return; }
-      setCompany(comp);
-      setPrograms(progList || []);
-    })();
+        if (profile?.role !== "company") {
+          if (mounted) router.replace("/alumno/buscar");
+          return;
+        }
+
+        const [companyResult, programsResult] = await Promise.all([
+          supabase.from("companies").select("id,name").eq("owner_id", user.id).single(),
+          supabase.from("programs").select("id,key,name").order("name", { ascending: true })
+        ]);
+
+        if (!mounted) return;
+
+        if (companyResult.error) {
+          console.error("Error loading company:", companyResult.error);
+          if (mounted) setErr("Error cargando datos de la empresa.");
+          return;
+        }
+
+        if (!companyResult.data) {
+          if (mounted) setErr("Crea tu ficha de empresa primero.");
+          return;
+        }
+
+        if (mounted) {
+          setCompany(companyResult.data);
+          setPrograms(programsResult.data || []);
+          setErr("");
+        }
+      } catch (error) {
+        console.error("Error loading data:", error);
+        if (mounted) setErr("Error cargando los datos.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      mounted = false;
+    };
   }, [router]);
 
+  const handleInputChange = (field) => (e) => {
+    setForm(prev => ({
+      ...prev,
+      [field]: e.target.value
+    }));
+  };
+
+  const handleSelectChange = (field) => (e) => {
+    const value = field === 'spots_total' ? Number(e.target.value) : e.target.value;
+    setForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleProgramToggle = (programId) => {
+    setProgramIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(programId)) {
+        newSet.delete(programId);
+      } else {
+        newSet.add(programId);
+      }
+      return Array.from(newSet);
+    });
+  };
+
   const save = async () => {
+    if (!company) {
+      alert("No se encontró la empresa. Verifica tu perfil.");
+      return;
+    }
+    
+    if (!form.title.trim()) {
+      alert("Escribe un título para la vacante.");
+      return;
+    }
+
+    setSaving(true);
+    
     try {
-      if (!company) return;
-      if (!form.title.trim()) { alert("Escribe un título."); return; }
-
-      setSaving(true);
-      const payload = {
-        company_id: company.id,
-        title: form.title,
-        modality: form.modality,
-        compensation: form.compensation,
-        language: form.language,
-        location_text: form.location_text,
-        requirements: form.requirements,
-        activities: form.activities,
-        spots_total: Number(form.spots_total || 1),
-        status: form.status || "activa",
-      };
-
-      const { data, error } = await supabase
+      const { data: vacancy, error: vacancyError } = await supabase
         .from("vacancies")
-        .insert(payload)
+        .insert({
+          company_id: company.id,
+          title: form.title.trim(),
+          modality: form.modality,
+          compensation: form.compensation,
+          language: form.language,
+          location_text: form.location_text.trim(),
+          requirements: form.requirements.trim(),
+          activities: form.activities.trim(),
+          spots_total: form.spots_total,
+          status: form.status,
+        })
         .select("id")
         .single();
-      if (error) throw error;
 
-      // sincroniza programas
-      if (programIds.length) {
-        const rows = programIds.map(pid => ({ vacancy_id: data.id, program_id: pid }));
-        const { error: insErr } = await supabase.from("vacancy_programs").insert(rows);
-        if (insErr) throw insErr;
+      if (vacancyError) throw vacancyError;
+
+      if (programIds.length > 0) {
+        const programRows = programIds.map(programId => ({
+          vacancy_id: vacancy.id,
+          program_id: programId
+        }));
+
+        const { error: programError } = await supabase
+          .from("vacancy_programs")
+          .insert(programRows);
+
+        if (programError) {
+          console.warn("Error inserting programs:", programError);
+        }
       }
 
+      router.push(`/empresa/vacante/${vacancy.id}`);
+      
+    } catch (error) {
+      console.error("Error saving vacancy:", error);
+      alert(error.message || "No se pudo crear la vacante. Intenta de nuevo.");
+    } finally {
       setSaving(false);
-      router.replace(`/empresa/vacante/${data.id}`);
-    } catch (e) {
-      setSaving(false);
-      alert(e.message || "No se pudo crear la vacante.");
     }
   };
 
-  // UI helpers (estilos locales)
-  const Field = ({ label, children }) => (
-    <div style={{ display:"grid", gap:6 }}>
-      <div style={{ fontSize:12, fontWeight:700, color:"#1f2937" }}>{label}</div>
-      {children}
-    </div>
-  );
-  const taStyle = { width:"100%", background:"#fff", border:"1px solid #e6eaf1", borderRadius:10, padding:"10px 12px", outline:"none", fontFamily:"inherit", fontSize:14 };
-  const cardBox = { background:"#fff", border:"1px solid #e6eaf1", borderRadius:12, padding:"12px", marginTop:10 };
-  const cardTitle = { margin:"0 0 8px", fontSize:14, color:"#1f2937" };
-  const grid2 = { display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))", gap:12 };
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <main className="jobs-wrap">
+          <div className="nueva-vacante-container">
+            <div className="nueva-vacante-loading">Cargando...</div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>
       <Navbar />
       <main className="jobs-wrap">
-        <div className="jobs-grid" style={{ gridTemplateColumns:"1fr" }}>
-          <article className="jobs-detail" style={{ display:"block" }}>
-            <button className="jobs-apply" onClick={()=>router.back()} style={{ marginBottom:10, background:"#111827" }}>
-              ← Volver
+        <div className="nueva-vacante-container">
+          {/* Header */}
+          <div className="nueva-vacante-header">
+            <h1 className="nueva-vacante-title">Nueva vacante</h1>
+            <p className="nueva-vacante-subtitle">
+              Completa la información para publicar la vacante
+            </p>
+          </div>
+
+          {err && (
+            <div className="nueva-vacante-error">
+              {err}
+            </div>
+          )}
+
+          {/* Información general */}
+          <div className="nueva-vacante-card">
+            <h3 className="nueva-vacante-card-title">
+              Información general
+            </h3>
+            
+            <div className="nueva-vacante-grid">
+              {/* Título */}
+              <div className="nueva-vacante-field">
+                <label className="nueva-vacante-label">
+                  Título del puesto *
+                </label>
+                <input
+                  className="nueva-vacante-input"
+                  type="text"
+                  value={form.title}
+                  onChange={handleInputChange('title')}
+                  placeholder="Ej: Desarrollador Frontend Junior"
+                  required
+                />
+              </div>
+
+              {/* Ubicación */}
+              <div className="nueva-vacante-field">
+                <label className="nueva-vacante-label">
+                  Ubicación
+                </label>
+                <input
+                  className="nueva-vacante-input"
+                  type="text"
+                  value={form.location_text}
+                  onChange={handleInputChange('location_text')}
+                  placeholder="Ej: Ciudad Juárez, Chihuahua"
+                />
+              </div>
+
+              {/* Modalidad */}
+              <div className="nueva-vacante-field">
+                <label className="nueva-vacante-label">
+                  Modalidad
+                </label>
+                <select 
+                  className="nueva-vacante-input"
+                  value={form.modality} 
+                  onChange={handleSelectChange('modality')}
+                >
+                  <option value="presencial">Presencial</option>
+                  <option value="híbrido">Híbrido</option>
+                  <option value="remoto">Remoto</option>
+                </select>
+              </div>
+
+              {/* Compensación */}
+              <div className="nueva-vacante-field">
+                <label className="nueva-vacante-label">
+                  Compensación
+                </label>
+                <select 
+                  className="nueva-vacante-input"
+                  value={form.compensation} 
+                  onChange={handleSelectChange('compensation')}
+                >
+                  <option value="Apoyo económico">Apoyo económico</option>
+                  <option value="Sin apoyo">Sin apoyo</option>
+                </select>
+              </div>
+
+              {/* Idioma */}
+              <div className="nueva-vacante-field">
+                <label className="nueva-vacante-label">
+                  Idioma
+                </label>
+                <select 
+                  className="nueva-vacante-input"
+                  value={form.language} 
+                  onChange={handleSelectChange('language')}
+                >
+                  <option value="ES">Español</option>
+                  <option value="EN">Inglés</option>
+                </select>
+              </div>
+
+              {/* Cupo total */}
+              <div className="nueva-vacante-field">
+                <label className="nueva-vacante-label">
+                  Cupo total
+                </label>
+                <input
+                  className="nueva-vacante-input"
+                  type="number"
+                  min="1"
+                  value={form.spots_total}
+                  onChange={handleSelectChange('spots_total')}
+                />
+              </div>
+
+              {/* Estado */}
+              <div className="nueva-vacante-field">
+                <label className="nueva-vacante-label">
+                  Estado
+                </label>
+                <select 
+                  className="nueva-vacante-input"
+                  value={form.status} 
+                  onChange={handleSelectChange('status')}
+                >
+                  <option value="activa">Activa</option>
+                  <option value="inactiva">Inactiva</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Programas */}
+          <div className="nueva-vacante-card">
+            <h3 className="nueva-vacante-card-title">
+              Programas académicos
+            </h3>
+            
+            <div className="nueva-vacante-programs-list">
+              {programs.length > 0 ? (
+                programs.map(program => (
+                  <label 
+                    key={program.id}
+                    className="nueva-vacante-program-item"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={programIds.includes(program.id)}
+                      onChange={() => handleProgramToggle(program.id)}
+                    />
+                    <span className="nueva-vacante-program-label">
+                      <strong>{program.key}</strong> — {program.name}
+                    </span>
+                  </label>
+                ))
+              ) : (
+                <div style={{ color: "#6b7280", fontSize: "14px", textAlign: "center", padding: "20px" }}>
+                  No hay programas disponibles
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Actividades */}
+          <div className="nueva-vacante-card">
+            <h3 className="nueva-vacante-card-title">
+              Actividades
+            </h3>
+            <textarea
+              className="nueva-vacante-textarea"
+              value={form.activities}
+              onChange={handleInputChange('activities')}
+              placeholder="Describe las actividades que realizará el practicante..."
+              rows={5}
+            />
+          </div>
+
+          {/* Requisitos */}
+          <div className="nueva-vacante-card">
+            <h3 className="nueva-vacante-card-title">
+              Requisitos
+            </h3>
+            <textarea
+              className="nueva-vacante-textarea"
+              value={form.requirements}
+              onChange={handleInputChange('requirements')}
+              placeholder="Lista los requisitos necesarios para esta vacante..."
+              rows={5}
+            />
+          </div>
+
+          {/* Acciones */}
+          <div className="nueva-vacante-actions">
+            <button
+              className="nueva-vacante-cancel-btn"
+              onClick={() => router.push("/empresa/vacantes")}
+              disabled={saving}
+            >
+              Cancelar
             </button>
-            {err && <div className="jobs-error">{err}</div>}
-
-            <header className="jobs-detail-head">
-              <div className="jobs-detail-titles">
-                <h3 className="jobs-title">Nueva vacante</h3>
-                <div className="jobs-muted">Completa la información para publicar.</div>
-              </div>
-            </header>
-
-            <div style={cardBox}>
-              <h4 style={cardTitle}>Información general</h4>
-              <div style={grid2}>
-                <Field label="Título del puesto"><input className="login-input" value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))}/></Field>
-                <Field label="Ubicación (texto)"><input className="login-input" value={form.location_text} onChange={e=>setForm(f=>({...f,location_text:e.target.value}))}/></Field>
-                <Field label="Compensación">
-                  <select className="login-input" value={form.compensation} onChange={e=>setForm(f=>({...f,compensation:e.target.value}))}>
-                    <option>Apoyo económico</option><option>Sin apoyo</option>
-                  </select>
-                </Field>
-                <Field label="Modalidad">
-                  <select className="login-input" value={form.modality} onChange={e=>setForm(f=>({...f,modality:e.target.value}))}>
-                    <option value="presencial">presencial</option>
-                    <option value="híbrido">híbrido</option>
-                    <option value="remoto">remoto</option>
-                  </select>
-                </Field>
-                <Field label="Idioma">
-                  <select className="login-input" value={form.language} onChange={e=>setForm(f=>({...f,language:e.target.value}))}>
-                    <option>ES</option><option>EN</option>
-                  </select>
-                </Field>
-                <Field label="Cupo total">
-                  <input className="login-input" type="number" min={1} value={form.spots_total} onChange={e=>setForm(f=>({...f,spots_total:Number(e.target.value || 1)}))}/>
-                </Field>
-                <Field label="Estado">
-                  <select className="login-input" value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
-                    <option value="activa">activa</option>
-                    <option value="inactiva">inactiva</option>
-                  </select>
-                </Field>
-              </div>
-            </div>
-
-            <div style={cardBox}>
-              <h4 style={cardTitle}>Programas</h4>
-              <div style={{ display:"grid", gap:8 }}>
-                {programs.map(p => {
-                  const checked = programIds.includes(p.id);
-                  return (
-                    <label key={p.id} style={{ display:"flex", alignItems:"center", gap:10 }}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const on = e.target.checked;
-                          setProgramIds(prev => {
-                            const set = new Set(prev);
-                            if (on) set.add(p.id); else set.delete(p.id);
-                            return Array.from(set);
-                          });
-                        }}
-                      />
-                      <span>{p.key} — {p.name}</span>
-                    </label>
-                  );
-                })}
-                {!programs.length && <div className="jobs-muted small">No hay programas dados de alta.</div>}
-              </div>
-            </div>
-
-            <div style={cardBox}>
-              <h4 style={cardTitle}>Actividades</h4>
-              <textarea rows={4} value={form.activities} onChange={e=>setForm(f=>({...f,activities:e.target.value}))} style={taStyle}/>
-            </div>
-            <div style={cardBox}>
-              <h4 style={cardTitle}>Requisitos obligatorios</h4>
-              <textarea rows={4} value={form.requirements} onChange={e=>setForm(f=>({...f,requirements:e.target.value}))} style={taStyle}/>
-            </div>
-
-            <div className="jobs-cta" style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
-              <button className="jobs-more" onClick={()=>router.push("/empresa/vacantes")}>Descartar</button>
-              <button className="jobs-apply" onClick={save} disabled={saving}>{saving ? "Guardando…" : "Guardar"}</button>
-            </div>
-          </article>
+            
+            <button
+              className="nueva-vacante-save-btn"
+              onClick={save}
+              disabled={saving || !form.title.trim()}
+            >
+              {saving ? "Guardando..." : "Publicar vacante"}
+            </button>
+          </div>
         </div>
       </main>
+
       <Footer />
     </>
   );

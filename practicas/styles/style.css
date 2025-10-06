@@ -848,7 +848,7 @@ body {
 
 .jobs-cta{ margin: 12px 0 6px; }
 .jobs-apply{
-  border:none; background: var(--color-principal); color:#fff; border-radius:8px;
+  border:none; background: var(--color-azul-secundario); color:#fff; border-radius:8px;
   padding: 10px 14px; cursor:pointer; font-weight:600;
 }
 .jobs-apply:hover{ filter: brightness(.95); }
@@ -1037,18 +1037,6 @@ body {
   background:#f8fafc; border:1px solid #e6eaf1; border-radius:10px;
   padding:10px 12px; color:#1f2937;
 }
-
-/* Botones utilitarios (reusa tus estilos) */
-.btn{
-  border:none; border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:700;
-}
-.btn-primary{ background: var(--color-azul-secundario); color:#fff; }
-.btn-primary:hover{ filter:brightness(.95); }
-.btn-ghost{ background:#fff; border:1px solid #e6eaf1; color:#1f2937; }
-.btn-ghost:hover{ background:#f7f8fb; }
-.btn-danger{ background:#b91c1c; color:#fff; }
-.file-hidden{ display:none; }
-.actions-row{ display:flex; gap:8px; flex-wrap:wrap; }
 
 /* Tips box */
 .tips-box{ margin-top:16px; border-top:1px solid #eef1f6; padding-top:12px; }
@@ -1590,4 +1578,861 @@ h1 {
 .cancel-btn:hover {
   background-color: #f8f9fa;
   transform: translateY(-1px);
+}
+
+ .form-group {
+          margin-bottom: 16px;
+        }
+        .form-group label {
+          display: block;
+          margin-bottom: 6px;
+          font-weight: 600;
+          color: #333;
+          font-size: 14px;
+        }
+        .time-range-selector {
+          display: flex;
+          gap: 12px;
+          align-items: end;
+        }
+        .time-select-group {
+          flex: 1;
+        }
+        .time-select-group label {
+          display: block;
+          margin-bottom: 4px;
+          font-size: 12px;
+          color: #666;
+          font-weight: normal;
+        }
+        .time-select {
+          width: 100%;
+          padding: 8px 12px;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          background: white;
+          font-size: 14px;
+        }
+        .prof-input {
+          width: 100%;
+          padding: 8px 12px;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          font-size: 14px;
+          margin-bottom: 0;
+        }
+        .prof-edit-form {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .result-item:hover {
+          background: #f8f9fa;
+        }
+        .recommend-panel {
+          animation: slideDown 0.2s ease-out;
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 899px) {
+          .jobs-grid { grid-template-columns: 1fr !important; }
+          .jobs-detail { display: none !important; }
+        }
+
+
+
+/* ------------------------------------------------- */
+/* ----------------- NUEVA VACANTE ----------------- */
+/* ------------------------------------------------- */
+
+.nueva-vacante-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.nueva-vacante-header {
+  margin-bottom: 24px;
+}
+
+.nueva-vacante-back-btn {
+  background: none;
+  border: none;
+  color: var(--color-azul-secundario);
+  cursor: pointer;
+  padding: 8px 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.nueva-vacante-title {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-azul-oscuro);
+}
+
+.nueva-vacante-subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.nueva-vacante-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.nueva-vacante-card {
+  background: #fff;
+  border: 1px solid #e6eaf1;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.nueva-vacante-card-title {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-azul-oscuro);
+}
+
+.nueva-vacante-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.nueva-vacante-field {
+  display: grid;
+  gap: 6px;
+}
+
+.nueva-vacante-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.nueva-vacante-input {
+  width: 100%;
+  background: #fff;
+  border: 1px solid #e6eaf1;
+  border-radius: 8px;
+  padding: 12px;
+  outline: none;
+  font-family: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.nueva-vacante-input:focus {
+  border-color: var(--color-azul-secundario);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.nueva-vacante-textarea {
+  width: 100%;
+  background: #fff;
+  border: 1px solid #e6eaf1;
+  border-radius: 8px;
+  padding: 12px;
+  outline: none;
+  font-family: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 120px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.nueva-vacante-textarea:focus {
+  border-color: var(--color-azul-secundario);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.nueva-vacante-programs-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.nueva-vacante-program-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.nueva-vacante-program-label {
+  font-size: 14px;
+  color: #374151;
+}
+
+.nueva-vacante-program-label strong {
+  color: var(--color-azul-oscuro);
+}
+
+.nueva-vacante-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.nueva-vacante-cancel-btn {
+  padding: 12px 24px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nueva-vacante-cancel-btn:hover {
+  background: #f9fafb;
+  transform: translateY(-1px);
+}
+
+.nueva-vacante-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.nueva-vacante-save-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-azul-secundario);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nueva-vacante-save-btn:hover:not(:disabled) {
+  background: var(--color-principal);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+}
+
+.nueva-vacante-save-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.nueva-vacante-loading {
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+}
+
+/* Checkbox personalizado */
+.nueva-vacante-program-item input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  appearance: none;
+  background: #fff;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.nueva-vacante-program-item input[type="checkbox"]:checked {
+  background: var(--color-azul-secundario);
+  border-color: var(--color-azul-secundario);
+}
+
+.nueva-vacante-program-item input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Placeholders */
+.nueva-vacante-input::placeholder,
+.nueva-vacante-textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .nueva-vacante-container {
+    padding: 16px;
+  }
+  
+  .nueva-vacante-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .nueva-vacante-actions {
+    flex-direction: column;
+  }
+  
+  .nueva-vacante-cancel-btn,
+  .nueva-vacante-save-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .nueva-vacante-title {
+    font-size: 20px;
+  }
+  
+  .nueva-vacante-card {
+    padding: 16px;
+  }
+  
+  .nueva-vacante-card-title {
+    font-size: 16px;
+  }
+}
+
+
+/* ------------------------------------------------- */
+/* ------------ PÁGINA DETALLE VACANTE ------------- */
+/* ------------------------------------------------- */
+
+.empresa-vacante-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Header con botón volver */
+.empresa-vacante-header {
+  margin-bottom: 24px;
+}
+
+.empresa-vacante-back-btn {
+  background: none;
+  border: none;
+  color: var(--color-azul-secundario);
+  cursor: pointer;
+  padding: 8px 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  transition: color 0.2s ease;
+}
+
+.empresa-vacante-back-btn:hover {
+  color: var(--color-principal);
+}
+
+.empresa-vacante-title-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.empresa-vacante-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-azul-oscuro);
+  line-height: 1.2;
+}
+
+.empresa-vacante-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.status-indicator {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-indicator.activa {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.status-indicator.inactiva {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.empresa-vacante-cupo {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* Tabs de navegación */
+.empresa-vacante-tabs {
+  display: flex;
+  border-bottom: 1px solid #e6eaf1;
+  margin-bottom: 24px;
+}
+
+.empresa-tab {
+  background: none;
+  border: none;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.empresa-tab:hover {
+  color: var(--color-principal);
+}
+
+.empresa-tab.active {
+  color: var(--color-azul-secundario);
+  border-bottom-color: var(--color-azul-secundario);
+}
+
+/* Contenido principal */
+.empresa-vacante-content {
+  background: #fff;
+  border: 1px solid #e6eaf1;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,.05);
+}
+
+/* Sección de detalles */
+.empresa-vacante-details {
+  padding: 24px;
+}
+
+.empresa-vacante-info {
+  margin-bottom: 24px;
+}
+
+.empresa-vacante-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.empresa-chip {
+  background: #f8fafc;
+  border: 1px solid #e6eaf1;
+  color: #475569;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.empresa-vacante-location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #374151;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.empresa-vacante-section {
+  margin-bottom: 20px;
+}
+
+.empresa-vacante-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-azul-oscuro);
+}
+
+.empresa-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.empresa-list li {
+  margin-bottom: 6px;
+}
+
+/* Acciones de la vacante */
+.empresa-vacante-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #eef1f6;
+}
+
+/* Formulario de edición */
+.empresa-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.empresa-edit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.empresa-edit-section h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-azul-oscuro);
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eef1f6;
+}
+
+.empresa-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.empresa-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.empresa-edit-field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.empresa-edit-field input,
+.empresa-edit-field select,
+.empresa-edit-field textarea {
+  padding: 10px 12px;
+  border: 1px solid #e6eaf1;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.empresa-edit-field input:focus,
+.empresa-edit-field select:focus,
+.empresa-edit-field textarea:focus {
+  outline: none;
+  border-color: var(--color-azul-secundario);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.empresa-programs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid #e6eaf1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.empresa-program-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.empresa-program-checkbox:hover {
+  background: #f1f5f9;
+}
+
+.empresa-program-checkbox input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  appearance: none;
+  background: #fff;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.empresa-program-checkbox input[type="checkbox"]:checked {
+  background: var(--color-azul-secundario);
+  border-color: var(--color-azul-secundario);
+}
+
+.empresa-program-checkbox input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.empresa-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #eef1f6;
+}
+
+/* Sección de postulaciones */
+.empresa-vacante-applications {
+  padding: 24px;
+}
+
+.empresa-no-applications {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.empresa-applications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Tarjeta de estudiante */
+.empresa-student-card {
+  background: #fff;
+  border: 1px solid #e6eaf1;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.empresa-student-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+}
+
+.empresa-student-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.empresa-student-header:hover {
+  background: #f8fafc;
+}
+
+.empresa-student-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.empresa-student-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.empresa-student-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--color-principal);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.empresa-student-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.empresa-student-name {
+  font-weight: 600;
+  color: var(--color-azul-oscuro);
+  margin-bottom: 4px;
+  font-size: 16px;
+}
+
+.empresa-student-subtitle {
+  color: #6b7280;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.empresa-student-meta {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.empresa-student-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.empresa-student-details {
+  padding: 0 16px 16px 72px;
+  border-top: 1px solid #eef1f6;
+  margin-top: 8px;
+  padding-top: 16px;
+}
+
+.empresa-student-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Estados de carga y error */
+.empresa-vacante-loading {
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+}
+
+.empresa-vacante-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .empresa-vacante-container {
+    padding: 16px;
+  }
+  
+  .empresa-vacante-title-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .empresa-vacante-status {
+    align-items: flex-start;
+  }
+  
+  .empresa-vacante-tabs {
+    overflow-x: auto;
+  }
+  
+  .empresa-edit-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .empresa-vacante-actions {
+    flex-direction: column;
+  }
+  
+  .empresa-student-header {
+    padding: 12px;
+  }
+  
+  .empresa-student-details {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  
+  .empresa-student-status {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .empresa-vacante-title {
+    font-size: 24px;
+  }
+  
+  .empresa-vacante-details {
+    padding: 16px;
+  }
+  
+  .empresa-vacante-applications {
+    padding: 16px;
+  }
+  
+  .empresa-student-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .empresa-student-status {
+    align-self: stretch;
+    flex-direction: row;
+    justify-content: space-between;
+  }
 }

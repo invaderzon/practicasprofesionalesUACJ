@@ -282,24 +282,6 @@ export default function VacanteDetallePage() {
                     <MapEmbedByAddress address={vacancy.location_text} />
                   </section>
                 )}
-
-                <div className="jobs-cta">
-                  <button
-                    className="jobs-apply"
-                    disabled={applyLoading || appliedVacancyIds.includes(vacancy.id) || vacancy.spots_left <= 0}
-                    onClick={onApply}
-                    style={{ 
-                      width: "100%",
-                      marginTop: 20,
-                      opacity: (appliedVacancyIds.includes(vacancy.id) || vacancy.spots_left <= 0) ? 0.6 : 1
-                    }}
-                  >
-                    {applyLoading ? "Enviando..." : 
-                     appliedVacancyIds.includes(vacancy.id) ? "Ya postulada" : 
-                     vacancy.spots_left <= 0 ? "Cupos agotados" : 
-                     "Postularse ahora"}
-                  </button>
-                </div>
               </div>
             )}
           </article>

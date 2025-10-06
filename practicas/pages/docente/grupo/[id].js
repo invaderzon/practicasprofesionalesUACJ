@@ -40,10 +40,11 @@ export default function GrupoDetalle() {
   const [students, setStudents] = useState([]);
   const [active, setActive] = useState(null);
 
-
-  
   // programas (para mapear id -> nombre)
   const [programs, setPrograms] = useState([]);
+  
+  // 👇 Programa del profesor
+  const [professorProgramId, setProfessorProgramId] = useState(null);
 
   // ---- Búsqueda de alumnos ----
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,24 +55,39 @@ export default function GrupoDetalle() {
   const [results, setResults] = useState([]);
   const [candidate, setCandidate] = useState(null);
   const [alreadyInGroup, setAlreadyInGroup] = useState(false);
+  const [alreadyInOtherGroup, setAlreadyInOtherGroup] = useState(false); // 👈 NUEVO: para controlar si está en otro grupo
+  const [existingGroupInfo, setExistingGroupInfo] = useState(null); // 👈 NUEVO: información del grupo existente
   const [savingAdd, setSavingAdd] = useState(false);
   const searchSeq = useRef(0);
 
   // ---- Menú kebab abierto ----
   const [openMenuId, setOpenMenuId] = useState(null);
 
-  // Carga inicial: programas + miembros
+  // Carga inicial: programas + miembros + programa del profesor
   useEffect(() => {
     if (!groupId) return;
     const load = async () => {
       setLoading(true); setErr("");
 
+      // Obtener programas
       const { data: progList } = await supabase
         .from("programs")
         .select("id, name, key")
         .order("name", { ascending: true });
       setPrograms(progList || []);
 
+      // 👇 Obtener el programa del profesor
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: professorProfile } = await supabase
+          .from("profiles")
+          .select("program_id")
+          .eq("id", user.id)
+          .single();
+        setProfessorProgramId(professorProfile?.program_id || null);
+      }
+
+      // Obtener miembros del grupo
       const { data: members, error } = await supabase
         .from("group_members")
         .select(`
@@ -108,7 +124,7 @@ export default function GrupoDetalle() {
     );
   }, [students, searchQuery]);
 
-  // Buscar alumnos por nombre o matrícula (email) - para agregar
+  // Buscar alumnos por nombre o matrícula (email) - SOLO del mismo programa del profesor
   useEffect(() => {
     let ignore = false;
     const run = async () => {
@@ -117,11 +133,21 @@ export default function GrupoDetalle() {
 
       const my = ++searchSeq.current;
       const like = `%${q}%`;
-      const { data, error } = await supabase
+      
+      // 👇 Construir consulta base
+      let queryBuilder = supabase
         .from("profiles")
         .select("id, full_name, email, avatar_url, cv_url, program_id")
         .eq("role", "student")
-        .or(`full_name.ilike.${like},email.ilike.${like}`)
+        .or(`full_name.ilike.${like},email.ilike.${like}`);
+
+      // 👇 Filtrar por programa del profesor si existe
+      if (professorProgramId) {
+        queryBuilder = queryBuilder.eq("program_id", professorProgramId);
+      }
+
+      // Ejecutar consulta
+      const { data, error } = await queryBuilder
         .order("full_name", { ascending: true })
         .limit(8);
 
@@ -131,63 +157,146 @@ export default function GrupoDetalle() {
     };
     run();
     return () => { ignore = true; };
-  }, [addingOpen, query]);
+  }, [addingOpen, query, professorProgramId]);
 
-  // Verifica si el candidato ya está en el grupo
+  // 👇 VERIFICAR SI EL CANDIDATO YA ESTÁ EN ESTE GRUPO U OTRO GRUPO
   useEffect(() => {
-    const check = async () => {
-      if (!candidate?.id || !groupId) { setAlreadyInGroup(false); return; }
-      const { data } = await supabase
-        .from("group_members")
-        .select("student_id")
-        .eq("group_id", groupId)
-        .eq("student_id", candidate.id)
-        .maybeSingle();
-      setAlreadyInGroup(!!data);
+    const checkCandidate = async () => {
+      if (!candidate?.id || !groupId) { 
+        setAlreadyInGroup(false);
+        setAlreadyInOtherGroup(false);
+        setExistingGroupInfo(null);
+        return; 
+      }
+
+      try {
+        // Verificar si ya está en ESTE grupo
+        const { data: currentGroup } = await supabase
+          .from("group_members")
+          .select("group_id")
+          .eq("group_id", groupId)
+          .eq("student_id", candidate.id)
+          .maybeSingle();
+
+        setAlreadyInGroup(!!currentGroup);
+
+        // Verificar si está en OTRO grupo (excluyendo este grupo)
+        const { data: otherGroups, error } = await supabase
+          .from("group_members")
+          .select(`
+            group_id,
+            group:groups (
+              id,
+              name,
+              professor:profiles!groups_professor_id_fkey (
+                full_name
+              )
+            )
+          `)
+          .eq("student_id", candidate.id)
+          .neq("group_id", groupId); // 👈 Excluir este grupo
+
+        if (error) throw error;
+
+        const isInOtherGroup = otherGroups && otherGroups.length > 0;
+        setAlreadyInOtherGroup(isInOtherGroup);
+
+        // Si está en otro grupo, guardar la información
+        if (isInOtherGroup && otherGroups[0].group) {
+          setExistingGroupInfo({
+            groupName: otherGroups[0].group.name,
+            professorName: otherGroups[0].group.professor?.full_name || 'Profesor'
+          });
+        } else {
+          setExistingGroupInfo(null);
+        }
+
+      } catch (error) {
+        console.error("Error verificando grupos del alumno:", error);
+        setAlreadyInOtherGroup(false);
+        setExistingGroupInfo(null);
+      }
     };
-    check();
+
+    checkCandidate();
   }, [candidate?.id, groupId]);
 
   const onAddConfirm = async () => {
-  if (!candidate?.id || !groupId) return;
-  try {
-    setSavingAdd(true);
-    if (!alreadyInGroup) {
-      const { error } = await supabase.from("group_members").insert({
-        group_id: groupId,
-        student_id: candidate.id,
-      });
-      if (error && !String(error.message).includes("duplicate")) throw error;
+    // 👇 PREVENIR AGREGAR SI YA ESTÁ EN OTRO GRUPO
+    if (!candidate?.id || !groupId || alreadyInOtherGroup) return;
+    
+    try {
+      setSavingAdd(true);
+      if (!alreadyInGroup) {
+        const { error } = await supabase.from("group_members").insert({
+          group_id: groupId,
+          student_id: candidate.id,
+        });
+        if (error && !String(error.message).includes("duplicate")) throw error;
+      }
+      // refresca listado
+      const { data: members } = await supabase
+        .from("group_members")
+        .select(`student:profiles ( 
+          id, full_name, email, avatar_url, cv_url, program_id, 
+          practices(student_id),
+          applications(status, decision, vacancy:vacancies (
+            id, title, modality, compensation, language, requirements, activities,
+            location_text, rating_avg, rating_count, status, created_at, company_id,
+            spots_total, spots_taken, spots_left,
+            company:companies ( id, name, industry, logo_url )
+          )) 
+        )`)
+        .eq("group_id", groupId);
+
+      const arr = (members || []).map(m => m.student);
+      setStudents(arr);
+      setActive(arr.find(s => s.id === candidate.id) || arr[0] || null);
+
+      // Animación al cerrar después de agregar
+      const formCard = document.querySelector('.add-form-card');
+      if (formCard) {
+        formCard.classList.add('exiting');
+        setTimeout(() => {
+          setAddingOpen(false);
+          setQuery("");
+          setResults([]);
+          setCandidate(null);
+          setAlreadyInGroup(false);
+          setAlreadyInOtherGroup(false); // 👈 Limpiar estado
+          setExistingGroupInfo(null); // 👈 Limpiar información
+        }, 250);
+      } else {
+        setAddingOpen(false);
+        setQuery("");
+        setResults([]);
+        setCandidate(null);
+        setAlreadyInGroup(false);
+        setAlreadyInOtherGroup(false); // 👈 Limpiar estado
+        setExistingGroupInfo(null); // 👈 Limpiar información
+      }
+    } catch (e) {
+      alert(e.message || "No se pudo agregar.");
+    } finally {
+      setSavingAdd(false);
     }
-    // refresca listado
-    const { data: members } = await supabase
-      .from("group_members")
-      .select(`student:profiles ( 
-        id, full_name, email, avatar_url, cv_url, program_id, 
-        practices(student_id),
-        applications(status, decision, vacancy:vacancies (
-          id, title, modality, compensation, language, requirements, activities,
-          location_text, rating_avg, rating_count, status, created_at, company_id,
-          spots_total, spots_taken, spots_left,
-          company:companies ( id, name, industry, logo_url )
-        )) 
-      )`)
-      .eq("group_id", groupId);
+  };
 
-    const arr = (members || []).map(m => m.student);
-    setStudents(arr);
-    setActive(arr.find(s => s.id === candidate.id) || arr[0] || null);
-
-    // Animación al cerrar después de agregar
+  const onAddDiscard = () => {
+    // Agregar clase de animación de salida
     const formCard = document.querySelector('.add-form-card');
     if (formCard) {
       formCard.classList.add('exiting');
+      
+      // Esperar a que termine la animación antes de limpiar el estado
       setTimeout(() => {
         setAddingOpen(false);
         setQuery("");
         setResults([]);
         setCandidate(null);
         setAlreadyInGroup(false);
+        setAlreadyInOtherGroup(false); // 👈 Limpiar estado
+        setExistingGroupInfo(null); // 👈 Limpiar información
       }, 250);
     } else {
       setAddingOpen(false);
@@ -195,36 +304,10 @@ export default function GrupoDetalle() {
       setResults([]);
       setCandidate(null);
       setAlreadyInGroup(false);
+      setAlreadyInOtherGroup(false); // 👈 Limpiar estado
+      setExistingGroupInfo(null); // 👈 Limpiar información
     }
-  } catch (e) {
-    alert(e.message || "No se pudo agregar.");
-  } finally {
-    setSavingAdd(false);
-  }
-};
-
-const onAddDiscard = () => {
-  // Agregar clase de animación de salida
-  const formCard = document.querySelector('.add-form-card');
-  if (formCard) {
-    formCard.classList.add('exiting');
-    
-    // Esperar a que termine la animación antes de limpiar el estado
-    setTimeout(() => {
-      setAddingOpen(false);
-      setQuery("");
-      setResults([]);
-      setCandidate(null);
-      setAlreadyInGroup(false);
-    }, 250);
-  } else {
-    setAddingOpen(false);
-    setQuery("");
-    setResults([]);
-    setCandidate(null);
-    setAlreadyInGroup(false);
-  }
-};
+  };
 
   const removeFromGroup = async (studentId) => {
     if (!confirm("¿Seguro que deseas eliminar este alumno del grupo?")) return;
@@ -297,7 +380,7 @@ const onAddDiscard = () => {
 
   // Navegar a detalles de vacante
   const navigateToVacancy = (vacancyId) => {
-    router.push(`/vacante/${vacancyId}`);
+    router.push(`../vacante/${vacancyId}`);
   };
 
   return (
@@ -322,7 +405,6 @@ const onAddDiscard = () => {
         <div className="jobs-grid">
           {/* Lista de alumnos (columna izquierda) */}
           <aside className="jobs-listing" style={{ position: "relative" }}>
-
 
             {/* Botón fijo arriba */}
             <div className="add-sticky">
@@ -349,6 +431,19 @@ const onAddDiscard = () => {
                         Cancelar
                       </button>
                     </div>
+                    
+                    {/* 👇 Mensaje informativo sobre el filtro por programa */}
+                    {professorProgramId && (
+                      <div style={{ 
+                        fontSize: '12px', 
+                        color: '#666', 
+                        marginBottom: '8px',
+                        fontStyle: 'italic'
+                      }}>
+                        Mostrando solo alumnos de tu programa
+                      </div>
+                    )}
+                    
                     <input
                       className="login-input"
                       type="text"
@@ -357,6 +452,7 @@ const onAddDiscard = () => {
                       onChange={(e) => setQuery(e.target.value)}
                       autoFocus
                     />
+                    
                     {results.length > 0 && !candidate && (
                       <div className="add-results">
                         {results.map((r) => (
@@ -365,11 +461,29 @@ const onAddDiscard = () => {
                             <div className="result-texts">
                               <div className="r-name">{r.full_name}</div>
                               <div className="r-sub">{r.email}</div>
+                              {r.program_id && (
+                                <div className="r-program">{programName(r.program_id)}</div>
+                              )}
                             </div>
                           </button>
                         ))}
                       </div>
                     )}
+                    
+                    {query.length >= 2 && results.length === 0 && (
+                      <div style={{ 
+                        textAlign: 'center', 
+                        padding: '16px', 
+                        color: '#666',
+                        fontSize: '14px'
+                      }}>
+                        {professorProgramId 
+                          ? "No se encontraron alumnos de tu programa con ese criterio." 
+                          : "No se encontraron alumnos con ese criterio."
+                        }
+                      </div>
+                    )}
+                    
                     {candidate && (
                       <div className="preview-card">
                         <div className="prev-row">
@@ -385,10 +499,47 @@ const onAddDiscard = () => {
                             )}
                           </div>
                         </div>
-                        {alreadyInGroup && <div className="prev-note">Este alumno ya forma parte de este grupo.</div>}
+
+                        {/* 👇 MENSAJE SI YA ESTÁ EN ESTE GRUPO */}
+                        {alreadyInGroup && (
+                          <div className="prev-note info">
+                            Este alumno ya forma parte de este grupo.
+                          </div>
+                        )}
+
+                        {/* 👇 MENSAJE SI YA ESTÁ EN OTRO GRUPO */}
+                        {alreadyInOtherGroup && existingGroupInfo && (
+                          <div className="prev-note warning" style={{ 
+                            backgroundColor: '#fef3cd', 
+                            border: '1px solid #fde68a',
+                            color: '#92400e',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            marginTop: '12px'
+                          }}>
+                            <strong>⚠️ No se puede agregar</strong>
+                            <div style={{ marginTop: '4px', fontSize: '14px' }}>
+                              Este alumno ya pertenece al grupo <strong>"{existingGroupInfo.groupName}"</strong> del profesor <strong>{existingGroupInfo.professorName}</strong>.
+                            </div>
+                            <div style={{ marginTop: '4px', fontSize: '13px', fontStyle: 'italic' }}>
+                              Un alumno no puede estar en más de un grupo simultáneamente.
+                            </div>
+                          </div>
+                        )}
+
                         <div className="prev-actions">
                           <button className="btn btn-ghost" onClick={onAddDiscard}>Descartar</button>
-                          <button className="btn btn-primary" onClick={onAddConfirm} disabled={savingAdd}>
+                          
+                          {/* 👇 BOTÓN DESHABILITADO SI YA ESTÁ EN OTRO GRUPO */}
+                          <button 
+                            className="btn btn-primary" 
+                            onClick={onAddConfirm} 
+                            disabled={savingAdd || alreadyInOtherGroup}
+                            style={{
+                              opacity: alreadyInOtherGroup ? 0.5 : 1,
+                              cursor: alreadyInOtherGroup ? 'not-allowed' : 'pointer'
+                            }}
+                          >
                             {savingAdd ? "Guardando…" : alreadyInGroup ? "Actualizar" : "Agregar"}
                           </button>
                         </div>
@@ -399,8 +550,6 @@ const onAddDiscard = () => {
                 </div>
               )}
             </div>
-
-
 
             {/* Alumnos - MANTIENE ORDEN ORIGINAL */}
             {!loading && filteredStudents.map((s) => (
@@ -437,7 +586,7 @@ const onAddDiscard = () => {
             )}
           </aside>
 
-          {/* Detalle del alumno (columna derecha) */}
+          {/* 👇 DETALLE DEL ALUMNO (COLUMNA DERECHA) - ESTA ES LA PARTE QUE FALTABA */}
           <section className="jobs-detail" style={{ display: "block" }}>
             {!active ? (
               <div className="jobs-empty small">Selecciona un alumno.</div>

@@ -1,4 +1,4 @@
-// pages/alumno/buscar.js
+// pages/profesores/buscar.js
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
@@ -43,60 +43,6 @@ const MAP_DB_TO_UI = {
 };
 const fmtMod = (dbVal) => MAP_DB_TO_UI.modalidad[dbVal] ?? dbVal ?? "Modalidad N/A";
 const fmtComp = (dbVal) => MAP_DB_TO_UI.comp[dbVal] ?? dbVal ?? "Compensación N/A";
-
-/* ---------- UI: icon buttons ---------- */
-function IconBtn({ title, onClick, children }) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-      style={{
-        display: "inline-grid",
-        placeItems: "center",
-        width: 36,
-        height: 36,
-        borderRadius: 999,
-        border: "1px solid #d6d8df",
-        background: "#fff",
-        color: "#1F3354",
-        cursor: "pointer",
-        boxShadow: "0 1px 4px rgba(0,0,0,.06)"
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-function IconBookmark({ active = false }) {
-  return active ? (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-      <path fill="#2563eb" d="M6 2h12a1 1 0 0 1 1 1v18l-7-4-7 4V3a1 1 0 0 1 1-1Z" />
-    </svg>
-  ) : (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-      <path
-        fill="none"
-        stroke="var(--color-principal)"
-        strokeWidth="2"
-        d="M6 2h12a1 1 0 0 1 1 1v18l-7-4-7 4V3a1 1 0 0 1 1-1Z"
-      />
-    </svg>
-  );
-}
-function IconBan() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-      <path
-        fill="#1F3354"
-        d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm5.657 15.657A8 8 0 1 1 20 12a7.95 7.95 0 0 1-2.343 5.657ZM7.05 7.05 16.95 16.95"
-        stroke="#1F3354"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 /* ---------- UI: logo empresa (o iniciales) ---------- */
 function LogoSquare({ src, name }) {
@@ -191,14 +137,40 @@ function MapEmbedByAddress({ address, zoom = 16 }) {
   );
 }
 
+/* ---------- Avatar circular con iniciales ---------- */
+function AvatarCircle({ src, name, size = 40 }) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt="Foto"
+        style={{ width: size, height: size, objectFit: "cover", borderRadius: "50%", display: "block" }}
+      />
+    );
+  }
+  const initials =
+    (name || "")
+      .trim()
+      .split(/\s+/)
+      .map((w) => w[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?";
+  return (
+    <div className="alumno-avatar-fallback" style={{ width: size, height: size, fontSize: size * 0.36 }}>
+      {initials}
+    </div>
+  );
+}
+
 /* ---------- Página ---------- */
-export default function EstudiantesPage() {
+export default function ProfesoresPage() {
   const router = useRouter();
   const reqSeq = useRef(0);
 
   // buscador y filtros
   const [q, setQ] = useState("");
-
   const [loc, setLoc] = useState("");
   const [filters, setFilters] = useState({ modalidad: "", comp: "", idioma: "" });
 
@@ -215,10 +187,16 @@ export default function EstudiantesPage() {
 
   // usuario y flags
   const [userId, setUserId] = useState(null);
-  const [studentProgramId, setStudentProgramId] = useState(null);
-  const [favIds, setFavIds] = useState([]);
-  const [hiddenIds, setHiddenIds] = useState([]);
-  const [appliedVacancyIds, setAppliedVacancyIds] = useState([]);
+  const [professorProgramId, setProfessorProgramId] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [students, setStudents] = useState([]);
+
+  // panel de recomendación
+  const [recommendOpen, setRecommendOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [recommendLoading, setRecommendLoading] = useState(false);
 
   /* ---------- BD: boot ---------- */
   useEffect(() => {
@@ -233,17 +211,43 @@ export default function EstudiantesPage() {
         .select("program_id")
         .eq("id", user.id)
         .single();
-      if (!ignore) setStudentProgramId(profile?.program_id ?? null);
+      if (!ignore) setProfessorProgramId(profile?.program_id ?? null);
 
-      const [{ data: favData }, { data: hidData }, { data: appsData }] = await Promise.all([
-        supabase.from("vacancy_favorites").select("vacancy_id").eq("student_id", user.id).limit(500),
-        supabase.from("vacancy_hidden").select("vacancy_id").eq("student_id", user.id).limit(500),
-        supabase.from("applications").select("vacancy_id").eq("student_id", user.id).limit(1000),
-      ]);
+      // Cargar grupos del profesor
+      const { data: groupsData } = await supabase
+        .from("groups")
+        .select("id, name")
+        .eq("professor_id", user.id)
+        .eq("hidden", false);
 
-      if (!ignore && favData) setFavIds(favData.map((x) => x.vacancy_id));
-      if (!ignore && hidData) setHiddenIds(hidData.map((x) => x.vacancy_id));
-      if (!ignore && appsData) setAppliedVacancyIds(appsData.map(a => a.vacancy_id));
+      if (groupsData?.length) {
+        setGroups(groupsData);
+        
+        // Cargar estudiantes de los grupos
+        const groupIds = groupsData.map(g => g.id);
+        const { data: membersData } = await supabase
+          .from("group_members")
+          .select(`
+            student:profiles (
+              id, full_name, email, avatar_url, program_id
+            )
+          `)
+          .in("group_id", groupIds);
+
+        if (membersData) {
+          const uniqueStudents = [];
+          const seenIds = new Set();
+          
+          membersData.forEach(member => {
+            if (member.student && !seenIds.has(member.student.id)) {
+              seenIds.add(member.student.id);
+              uniqueStudents.push(member.student);
+            }
+          });
+          
+          setStudents(uniqueStudents);
+        }
+      }
     };
     boot();
     return () => { ignore = true; };
@@ -256,7 +260,7 @@ export default function EstudiantesPage() {
       setLoading(true);
       setErrorMsg("");
 
-      if (!studentProgramId) {
+      if (!professorProgramId) {
         setVacancies([]);
         setSelected(null);
         setHasMore(false);
@@ -288,7 +292,7 @@ export default function EstudiantesPage() {
         `)
         .in("status", ["activa", "active"])
         .gt("spots_left", 0)
-        .eq("vacancy_programs.program_id", studentProgramId);
+        .eq("vacancy_programs.program_id", professorProgramId);
 
       if (q) {
         const safe = String(q).replace(/[\*\(\)",]/g, " ").trim();
@@ -314,11 +318,6 @@ export default function EstudiantesPage() {
 
       if (filters.idioma) query = query.eq("language", filters.idioma);
 
-      if (hiddenIds.length) {
-        const csvHidden = `(${hiddenIds.map(id => `"${id}"`).join(",")})`;
-        query = query.not("id", "in", csvHidden);
-      }
-
       const from = page * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
       query = query.order("created_at", { ascending: false }).range(from, to);
@@ -341,104 +340,70 @@ export default function EstudiantesPage() {
     };
 
     fetchData();
-  }, [q, loc, filters, page, hiddenIds, studentProgramId]);
+  }, [q, loc, filters, page, professorProgramId]);
 
-  /* ---------- BD: acciones favoritos/ocultas ---------- */
-  const toggleFavorite = async (vacancyId) => {
-    if (!userId) return;
-    try {
-      if (favIds.includes(vacancyId)) {
-        const { error } = await supabase
-          .from("vacancy_favorites")
-          .delete()
-          .eq("student_id", userId)
-          .eq("vacancy_id", vacancyId);
-        if (error) throw error;
-        setFavIds((prev) => prev.filter((id) => id !== vacancyId));
-      } else {
-        const { error } = await supabase
-          .from("vacancy_favorites")
-          .insert({ student_id: userId, vacancy_id: vacancyId });
-        if (error) throw error;
-        setFavIds((prev) => [...prev, vacancyId]);
-      }
-    } catch (e) {
-      console.error(e);
-      alert(e.message || "No se pudo actualizar favoritos.");
-    }
-  };
-
-  const toggleHidden = async (vacancyId) => {
-    if (!userId) return;
-    try {
-      if (hiddenIds.includes(vacancyId)) {
-        const { error } = await supabase
-          .from("vacancy_hidden")
-          .delete()
-          .eq("student_id", userId)
-          .eq("vacancy_id", vacancyId);
-        if (error) throw error;
-        setHiddenIds((prev) => prev.filter((id) => id !== vacancyId));
-      } else {
-        const { error: hideErr } = await supabase
-          .from("vacancy_hidden")
-          .insert({ student_id: userId, vacancy_id: vacancyId });
-        if (hideErr) throw hideErr;
-
-        if (favIds.includes(vacancyId)) {
-          const { error: favDelErr } = await supabase
-            .from("vacancy_favorites")
-            .delete()
-            .eq("student_id", userId)
-            .eq("vacancy_id", vacancyId);
-          if (favDelErr) throw favDelErr;
-          setFavIds((prev) => prev.filter((id) => id !== vacancyId));
-        }
-        setHiddenIds((prev) => [...prev, vacancyId]);
-
-        if (selected?.id === vacancyId) {
-          const next = vacancies.find((v) => v.id !== vacancyId && !hiddenIds.includes(v.id));
-          setSelected(next || null);
-        }
-      }
-    } catch (e) {
-      console.error(e);
-      alert(e.message || "No se pudo actualizar la visibilidad.");
-    }
-  };
-
-  /* ---------- BD: postularse ---------- */
-  /* ---------- BD: postularse (vía RPC SECURITY DEFINER) ---------- */
-const applyNow = async (vacancy) => {
-  try {
-    if (!userId) { router.push("/login"); return; }
-    if (!vacancy?.id) return;
-    if (appliedVacancyIds.includes(vacancy.id)) return;
-
-    // Llama a la función SQL: public.apply_and_notify(uuid)
-    const { error } = await supabase.rpc("apply_and_notify", {
-      p_vacancy_id: vacancy.id,
-    });
-
-    if (error) {
-      // Duplicado (ya postuló antes)
-      if ((error.code === "23505") || /duplicate key|already exists/i.test(error.message || "")) {
-        alert("Ya te habías postulado a esta vacante.");
-        setAppliedVacancyIds((prev) => (prev.includes(vacancy.id) ? prev : [...prev, vacancy.id]));
+  /* ---------- BD: buscar estudiantes para recomendar ---------- */
+  useEffect(() => {
+    let ignore = false;
+    const searchStudents = async () => {
+      const query = searchQuery.trim().toLowerCase();
+      if (!query || query.length < 2) {
+        setSearchResults([]);
         return;
       }
-      throw error;
-    }
 
-    // Éxito: marca como postulada en UI
-    setAppliedVacancyIds((prev) => [...prev, vacancy.id]);
-    alert("¡Listo! Tu postulación fue enviada.");
-  } catch (e) {
-    console.error(e);
-    alert(e.message || "No se pudo completar la postulación.");
+      const filtered = students.filter(student =>
+        student.full_name?.toLowerCase().includes(query) ||
+        student.email?.toLowerCase().includes(query)
+      );
+
+      if (!ignore) {
+        setSearchResults(filtered);
+      }
+    };
+
+    searchStudents();
+    return () => { ignore = true; };
+  }, [searchQuery, students]);
+
+  /* ---------- BD: recomendar vacante a estudiante ---------- */
+const recommendToStudent = async () => {
+  if (!selected || !selectedStudent || !userId) return;
+
+  try {
+    setRecommendLoading(true);
+
+    // Usar la función RPC
+    const { error } = await supabase.rpc('professor_recommend_vacancy', {
+      p_vacancy_id: selected.id,
+      p_student_id: selectedStudent.id
+    });
+
+    if (error) throw error;
+
+    alert(`✅ Se ha recomendado la vacante a ${selectedStudent.full_name}`);
+    setRecommendOpen(false);
+    setSelectedStudent(null);
+    setSearchQuery("");
+  } catch (error) {
+    console.error("Error recomendando vacante:", error);
+    alert("Error al recomendar la vacante: " + error.message);
+  } finally {
+    setRecommendLoading(false);
   }
 };
 
+  /* ---------- UI: abrir panel de recomendación ---------- */
+  const openRecommendPanel = () => {
+    if (!students.length) {
+      alert("No tienes estudiantes en tus grupos. Agrega estudiantes a tus grupos primero.");
+      return;
+    }
+    setRecommendOpen(true);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSelectedStudent(null);
+  };
 
   /* ---------- Render ---------- */
   const filtered = useMemo(() => vacancies, [vacancies]);
@@ -505,68 +470,48 @@ const applyNow = async (vacancy) => {
           <aside className="jobs-listing">
             {loading && Array.from({ length: 6 }).map((_, i) => <div className="jobs-card sk" key={i} />)}
 
-            {!loading && filtered.map((v) => {
-              const isFav = favIds.includes(v.id);
-              const isHidden = hiddenIds.includes(v.id);
-              return (
-                <button
-                  key={v.id}
-                  className={`jobs-card ${selected?.id === v.id ? "is-active" : ""}`}
-                  onClick={() => {
-                    if (typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches) {
-                      router.push(`/alumno/vacante/${v.id}`);
-                    } else {
-                      setSelected(v);
-                    }
-                  }}
-                >
-                  <div className="jobs-card-left" />
-                  <div className="jobs-card-body">
-                    <div className="jobs-card-top" style={{ justifyContent: "space-between" }}>
-                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                        <LogoSquare src={v.company?.logo_url} name={v.company?.name} />
-                        <div>
-                          <h4 className="jobs-card-title">{v.title}</h4>
-                          <div className="jobs-card-company">{v.company?.name || "Empresa"}</div>
-                          <div className="jobs-card-rating">
-                            <Stars rating={v.rating_avg} compact />
-                            <span className="jobs-muted small">({v.rating_count ?? 0})</span>
-                          </div>
+            {!loading && filtered.map((v) => (
+              <button
+                key={v.id}
+                className={`jobs-card ${selected?.id === v.id ? "is-active" : ""}`}
+                onClick={() => {
+                  if (typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches) {
+                    router.push(`/profesores/vacante/${v.id}`);
+                  } else {
+                    setSelected(v);
+                  }
+                }}
+              >
+                <div className="jobs-card-left" />
+                <div className="jobs-card-body">
+                  <div className="jobs-card-top" style={{ justifyContent: "space-between" }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <LogoSquare src={v.company?.logo_url} name={v.company?.name} />
+                      <div>
+                        <h4 className="jobs-card-title">{v.title}</h4>
+                        <div className="jobs-card-company">{v.company?.name || "Empresa"}</div>
+                        <div className="jobs-card-rating">
+                          <Stars rating={v.rating_avg} compact />
+                          <span className="jobs-muted small">({v.rating_count ?? 0})</span>
                         </div>
                       </div>
-
-                      <div className="jobs-card-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <IconBtn
-                          title={isFav ? "Quitar de favoritos" : "Agregar a favoritos"}
-                          onClick={() => toggleFavorite(v.id)}
-                        >
-                          <IconBookmark active={isFav} />
-                        </IconBtn>
-
-                        <IconBtn
-                          title={isHidden ? "Mostrar esta vacante" : "Ocultar esta vacante"}
-                          onClick={() => toggleHidden(v.id)}
-                        >
-                          <IconBan active={isHidden} />
-                        </IconBtn>
-                      </div>
-                    </div>
-
-                    <div className="jobs-meta">
-                      <span>{fmtMod(v.modality)}</span>
-                      <span>{fmtComp(v.compensation)}</span>
-                    </div>
-
-                    <div className="jobs-loc-row">
-                      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
-                        <path fill="currentColor" d="M12 2A7 7 0 0 0 5 9c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"/>
-                      </svg>
-                      <span className="jobs-muted">{v.location_text || "Ubicación no especificada"}</span>
                     </div>
                   </div>
-                </button>
-              );
-            })}
+
+                  <div className="jobs-meta">
+                    <span>{fmtMod(v.modality)}</span>
+                    <span>{fmtComp(v.compensation)}</span>
+                  </div>
+
+                  <div className="jobs-loc-row">
+                    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                      <path fill="currentColor" d="M12 2A7 7 0 0 0 5 9c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7m0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5Z"/>
+                    </svg>
+                    <span className="jobs-muted">{v.location_text || "Ubicación no especificada"}</span>
+                  </div>
+                </div>
+              </button>
+            ))}
 
             {!loading && hasMore && filtered.length > 0 && (
               <button className="jobs-more" onClick={() => setPage((p) => p + 1)}>
@@ -585,8 +530,8 @@ const applyNow = async (vacancy) => {
 
             {!loading && !selected && (
               <div className="jobs-empty">
-                {studentProgramId
-                  ? "No se encontró la vacante"
+                {professorProgramId
+                  ? "Selecciona una vacante para ver detalles"
                   : "Configura tu programa en el perfil para ver vacantes dirigidas a tu carrera."}
               </div>
             )}
@@ -622,7 +567,6 @@ const applyNow = async (vacancy) => {
                   {selected.location_text || "Ubicación no especificada"}
                 </p>
 
-
                 <hr className="jobs-sep" />
 
                 {selected.activities && (
@@ -650,13 +594,131 @@ const applyNow = async (vacancy) => {
                   </section>
                 )}
 
+                {/* Panel de recomendación */}
+                {recommendOpen && (
+                  <div className="recommend-panel" style={{
+                    border: "1px solid #e6eaf1",
+                    borderRadius: "12px",
+                    padding: "16px",
+                    marginTop: "20px",
+                    background: "#f8fafc"
+                  }}>
+                    <h3 style={{ margin: "0 0 16px 0", color: "#1F3354" }}>Recomendar a estudiante</h3>
+                    
+                    <div style={{ marginBottom: "16px" }}>
+                      <input
+                        className="login-input"
+                        type="text"
+                        placeholder="Buscar estudiante por nombre o email..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+
+                    {searchResults.length > 0 && !selectedStudent && (
+                      <div className="search-results" style={{
+                        border: "1px solid #e6eaf1",
+                        borderRadius: "8px",
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                        background: "white"
+                      }}>
+                        {searchResults.map((student) => (
+                          <button
+                            key={student.id}
+                            className="result-item"
+                            onClick={() => setSelectedStudent(student)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "12px",
+                              padding: "12px",
+                              width: "100%",
+                              border: "none",
+                              background: "transparent",
+                              cursor: "pointer",
+                              borderBottom: "1px solid #f1f3f4"
+                            }}
+                            onMouseEnter={(e) => e.target.style.background = "#f8f9fa"}
+                            onMouseLeave={(e) => e.target.style.background = "transparent"}
+                          >
+                            <AvatarCircle src={student.avatar_url} name={student.full_name} size={32} />
+                            <div style={{ textAlign: "left" }}>
+                              <div style={{ fontWeight: "600" }}>{student.full_name}</div>
+                              <div style={{ fontSize: "12px", color: "#666" }}>{student.email}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {selectedStudent && (
+                      <div className="selected-student" style={{
+                        padding: "12px",
+                        background: "white",
+                        borderRadius: "8px",
+                        border: "1px solid #e6eaf1",
+                        marginBottom: "16px"
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+                          <AvatarCircle src={selectedStudent.avatar_url} name={selectedStudent.full_name} size={40} />
+                          <div>
+                            <div style={{ fontWeight: "600" }}>{selectedStudent.full_name}</div>
+                            <div style={{ fontSize: "12px", color: "#666" }}>{selectedStudent.email}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button
+                            className="jobs-apply"
+                            onClick={recommendToStudent}
+                            disabled={recommendLoading}
+                            style={{ flex: 1 }}
+                          >
+                            {recommendLoading ? "Enviando..." : "Confirmar recomendación"}
+                          </button>
+                          <button
+                            className="jobs-apply"
+                            onClick={() => setSelectedStudent(null)}
+                            style={{ 
+                              flex: 1, 
+                              background: "#ffffffff", 
+                              color: "#1F3354",
+                              border: "1px solid #d6d8df"
+                            }}
+                          >
+                            Cambiar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "12px", color: "#666" }}>
+                        {students.length} estudiantes disponibles en tus grupos
+                      </span>
+                      <button
+                        className="jobs-apply"
+                        onClick={() => setRecommendOpen(false)}
+                        style={{ 
+                          background: "transparent", 
+                          color: "#666",
+                          border: "1px solid #d6d8df"
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="jobs-cta">
                   <button
                     className="jobs-apply"
-                    disabled={appliedVacancyIds.includes(selected.id)}
-                    onClick={() => applyNow(selected)}
+                    onClick={openRecommendPanel}
+                    style={{ background: "#10b981" }}
                   >
-                    {appliedVacancyIds.includes(selected.id) ? "Ya postulada" : "Postularse ahora"}
+                    Recomendar a estudiante
                   </button>
                 </div>
               </div>
@@ -667,6 +729,7 @@ const applyNow = async (vacancy) => {
         {errorMsg && <div className="jobs-error">{errorMsg}</div>}
       </main>
       <Footer />
+
     </>
   );
 }
