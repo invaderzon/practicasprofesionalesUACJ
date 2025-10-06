@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
 import Navbar from "../../components/navbar";
 import Footer from "../../components/footer";
+import { useActivePractice } from '../../components/hooks/useActivePractice';
 
 /* ---------- UI: catálogos ---------- */
 const MODALIDADES = ["Presencial", "Híbrida", "Remota"];
@@ -196,9 +197,10 @@ export default function EstudiantesPage() {
   const router = useRouter();
   const reqSeq = useRef(0);
 
+  const { hasActivePractice, loading: practiceLoading } = useActivePractice();
+
   // buscador y filtros
   const [q, setQ] = useState("");
-
   const [loc, setLoc] = useState("");
   const [filters, setFilters] = useState({ modalidad: "", comp: "", idioma: "" });
 
@@ -218,7 +220,10 @@ export default function EstudiantesPage() {
   const [studentProgramId, setStudentProgramId] = useState(null);
   const [favIds, setFavIds] = useState([]);
   const [hiddenIds, setHiddenIds] = useState([]);
-  const [appliedVacancyIds, setAppliedVacancyIds] = useState([]);
+  
+  // ✅ CORREGIDO: Separar claramente aplicaciones activas vs completadas
+  const [activeApplicationIds, setActiveApplicationIds] = useState([]); // No puedes postularte
+  const [completedVacancyIds, setCompletedVacancyIds] = useState([]);   // Sí puedes postularte
 
   /* ---------- BD: boot ---------- */
   useEffect(() => {
@@ -233,17 +238,52 @@ export default function EstudiantesPage() {
         .select("program_id")
         .eq("id", user.id)
         .single();
-      if (!ignore) setStudentProgramId(profile?.program_id ?? null);
+      
+      if (!ignore) {
+        setStudentProgramId(profile?.program_id ?? null);
+        console.log("🎯 Programa del estudiante:", profile?.program_id);
+      }
 
+      // Cargar favoritos, ocultas y aplicaciones
       const [{ data: favData }, { data: hidData }, { data: appsData }] = await Promise.all([
         supabase.from("vacancy_favorites").select("vacancy_id").eq("student_id", user.id).limit(500),
         supabase.from("vacancy_hidden").select("vacancy_id").eq("student_id", user.id).limit(500),
-        supabase.from("applications").select("vacancy_id").eq("student_id", user.id).limit(1000),
+        supabase.from("applications").select("vacancy_id, status").eq("student_id", user.id).limit(1000),
       ]);
 
       if (!ignore && favData) setFavIds(favData.map((x) => x.vacancy_id));
       if (!ignore && hidData) setHiddenIds(hidData.map((x) => x.vacancy_id));
-      if (!ignore && appsData) setAppliedVacancyIds(appsData.map(a => a.vacancy_id));
+      
+      if (!ignore && appsData) {
+        // ✅ CORREGIDO: Usar los valores exactos del ENUM application_status
+        // Basado en: DEFAULT 'postulada'::application_status
+        const ACTIVE_STATUSES = ["postulada", "en_revision", "oferta", "aceptada"];
+        const COMPLETED_STATUSES = ["completada", "terminada", "finalizada"];
+        
+        console.log("📊 Todas las aplicaciones:", appsData.map(app => ({ 
+          vacancy_id: app.vacancy_id, 
+          status: app.status 
+        })));
+        
+        const activeApps = appsData.filter(app => 
+          ACTIVE_STATUSES.includes(app.status)
+        );
+        const completedApps = appsData.filter(app => 
+          COMPLETED_STATUSES.includes(app.status)
+        );
+        
+        console.log("📊 Aplicaciones cargadas:", {
+          total: appsData.length,
+          activas: activeApps.length,
+          completadas: completedApps.length,
+          activasIds: activeApps.map(a => a.vacancy_id),
+          completadasIds: completedApps.map(a => a.vacancy_id),
+          estadosEncontrados: [...new Set(appsData.map(a => a.status))]
+        });
+        
+        setActiveApplicationIds(activeApps.map(a => a.vacancy_id));
+        setCompletedVacancyIds(completedApps.map(a => a.vacancy_id));
+      }
     };
     boot();
     return () => { ignore = true; };
@@ -256,15 +296,68 @@ export default function EstudiantesPage() {
       setLoading(true);
       setErrorMsg("");
 
+      // ✅ CORREGIDO: Si no hay studentProgramId, mostrar vacantes sin filtrar por programa
       if (!studentProgramId) {
-        setVacancies([]);
-        setSelected(null);
-        setHasMore(false);
+        console.log("⚠️ No hay programa asignado, mostrando todas las vacantes");
+        let query = supabase
+          .from("vacancies")
+          .select(`
+            id, title, modality, compensation, language, requirements, activities,
+            location_text, rating_avg, rating_count, status, created_at, company_id,
+            spots_total, spots_taken, spots_left,
+            company:companies!left ( id, name, industry, logo_url )
+          `)
+          .in("status", ["activa", "active"])
+          .gt("spots_left", 0);
+
+        // Aplicar filtros básicos
+        if (q) {
+          const safe = String(q).replace(/[\*\(\)",]/g, " ").trim();
+          const likeStar = `*${safe}*`;
+          query = query.or(`title.ilike.${likeStar},location_text.ilike.${likeStar}`);
+        }
+
+        if (loc) query = query.ilike("location_text", `%${loc}%`);
+
+        const dbMod = mapUIToDB_mod(filters.modalidad);
+        if (dbMod) query = query.eq("modality", dbMod);
+
+        if (filters.comp) {
+          const k = norm(filters.comp);
+          if (k === "apoyo economico") query = query.in("compensation", COMP_VARIANTS.apoyo);
+          else if (k === "sin apoyo") query = query.in("compensation", COMP_VARIANTS.sin);
+        }
+
+        if (filters.idioma) query = query.eq("language", filters.idioma);
+
+        if (hiddenIds.length) {
+          const csvHidden = `(${hiddenIds.map(id => `"${id}"`).join(",")})`;
+          query = query.not("id", "in", csvHidden);
+        }
+
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        query = query.order("created_at", { ascending: false }).range(from, to);
+
+        const { data, error } = await query;
+        if (myId !== reqSeq.current) return;
+
+        if (error) {
+          setErrorMsg(error.message || "Error al cargar vacantes.");
+          setVacancies([]);
+          setSelected(null);
+          setHasMore(false);
+        } else {
+          setVacancies(data || []);
+          setSelected((data && data[0]) || null);
+          setHasMore((data || []).length === PAGE_SIZE);
+        }
+
         setLoading(false);
-        setErrorMsg("Tu perfil no tiene un programa asignado. Actualiza tu programa para ver vacantes.");
         return;
       }
 
+      // Si hay studentProgramId, filtrar por programa
       let companyIds = [];
       if (q) {
         const safeQ = String(q).replace(/[%*(),"]/g, " ").trim();
@@ -407,41 +500,84 @@ export default function EstudiantesPage() {
     }
   };
 
-  /* ---------- BD: postularse ---------- */
   /* ---------- BD: postularse (vía RPC SECURITY DEFINER) ---------- */
-const applyNow = async (vacancy) => {
-  try {
-    if (!userId) { router.push("/login"); return; }
-    if (!vacancy?.id) return;
-    if (appliedVacancyIds.includes(vacancy.id)) return;
-
-    // Llama a la función SQL: public.apply_and_notify(uuid)
-    const { error } = await supabase.rpc("apply_and_notify", {
-      p_vacancy_id: vacancy.id,
-    });
-
-    if (error) {
-      // Duplicado (ya postuló antes)
-      if ((error.code === "23505") || /duplicate key|already exists/i.test(error.message || "")) {
-        alert("Ya te habías postulado a esta vacante.");
-        setAppliedVacancyIds((prev) => (prev.includes(vacancy.id) ? prev : [...prev, vacancy.id]));
+  const applyNow = async (vacancy) => {
+    try {
+      if (!userId) { router.push("/login"); return; }
+      if (!vacancy?.id) return;
+      
+      if (hasActivePractice) {
+        alert("Ya tienes una práctica activa. No puedes postularte a otras vacantes.");
         return;
       }
-      throw error;
+
+      // ✅ CORREGIDO: Solo verificar aplicaciones ACTIVAS
+      if (activeApplicationIds.includes(vacancy.id)) {
+        alert("Ya te has postulado a esta vacante.");
+        return;
+      }
+
+      // Si tiene una práctica COMPLETADA para esta vacante, mostrar confirmación
+      if (completedVacancyIds.includes(vacancy.id)) {
+        const ok = confirm("Ya completaste una práctica en esta vacante anteriormente. ¿Deseas postularte nuevamente?");
+        if (!ok) return;
+      }
+
+      // Llama a la función SQL: public.apply_and_notify(uuid)
+      const { error } = await supabase.rpc("apply_and_notify", {
+        p_vacancy_id: vacancy.id,
+      });
+
+      if (error) {
+        // Duplicado (ya postuló antes)
+        if ((error.code === "23505") || /duplicate key|already exists/i.test(error.message || "")) {
+          alert("Ya te habías postulado a esta vacante.");
+          setActiveApplicationIds((prev) => (prev.includes(vacancy.id) ? prev : [...prev, vacancy.id]));
+          return;
+        }
+        throw error;
+      }
+
+      // Éxito: marca como postulada en UI
+      setActiveApplicationIds((prev) => [...prev, vacancy.id]);
+      setCompletedVacancyIds((prev) => prev.filter(id => id !== vacancy.id)); // Remover de completadas
+      alert("¡Listo! Tu postulación fue enviada.");
+    } catch (e) {
+      console.error(e);
+      alert(e.message || "No se pudo completar la postulación.");
     }
+  };
 
-    // Éxito: marca como postulada en UI
-    setAppliedVacancyIds((prev) => [...prev, vacancy.id]);
-    alert("¡Listo! Tu postulación fue enviada.");
-  } catch (e) {
-    console.error(e);
-    alert(e.message || "No se pudo completar la postulación.");
-  }
-};
-
+  // Determinar el texto y estado del botón de postulación
+  const getApplyButtonState = (vacancyId) => {
+    if (hasActivePractice) {
+      return { text: "Práctica Activa", disabled: true };
+    } else if (activeApplicationIds.includes(vacancyId)) {
+      return { text: "Ya postulada", disabled: true };
+    } else if (completedVacancyIds.includes(vacancyId)) {
+      return { text: "Postularse nuevamente", disabled: false };
+    } else {
+      return { text: "Postularse ahora", disabled: false };
+    }
+  };
 
   /* ---------- Render ---------- */
   const filtered = useMemo(() => vacancies, [vacancies]);
+
+  // Mostrar loading mientras se verifica el estado de práctica
+  if (practiceLoading) {
+    return (
+      <>
+        <Navbar />
+        <main className="jobs-wrap">
+          <div style={{ textAlign: "center", padding: "50px" }}>
+            <div className="jobs-card sk" />
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>
@@ -477,6 +613,30 @@ const applyNow = async (vacancy) => {
           </button>
         </div>
 
+        {/* Mensaje de práctica activa */}
+        {hasActivePractice && (
+          <div className="jobs-error" style={{ 
+            background: "#f0fdf4", 
+            borderColor: "#bbf7d0", 
+            color: "#166534",
+            marginBottom: "16px"
+          }}>
+            <strong>¡Tienes un proyecto activo!</strong> No puedes postularte a nuevas vacantes mientras seas parte de un proyecto.
+          </div>
+        )}
+
+        {/* Mensaje de falta de programa */}
+        {!studentProgramId && !loading && (
+          <div className="jobs-error" style={{ 
+            background: "#fef3c7", 
+            borderColor: "#f59e0b", 
+            color: "#92400e",
+            marginBottom: "16px"
+          }}>
+            <strong>⚠️ Configura tu programa académico</strong> en tu perfil para ver vacantes específicas de tu carrera.
+          </div>
+        )}
+
         {/* filtros */}
         <div className="jobs-filters">
           <Pill
@@ -508,6 +668,8 @@ const applyNow = async (vacancy) => {
             {!loading && filtered.map((v) => {
               const isFav = favIds.includes(v.id);
               const isHidden = hiddenIds.includes(v.id);
+              const buttonState = getApplyButtonState(v.id);
+              
               return (
                 <button
                   key={v.id}
@@ -563,6 +725,23 @@ const applyNow = async (vacancy) => {
                       </svg>
                       <span className="jobs-muted">{v.location_text || "Ubicación no especificada"}</span>
                     </div>
+
+                    {/* Estado de postulación en la tarjeta */}
+                    <div style={{ marginTop: 8 }}>
+                      <span 
+                        className="jobs-muted small" 
+                        style={{ 
+                          color: completedVacancyIds.includes(v.id) ? "#f59e0b" : 
+                                activeApplicationIds.includes(v.id) ? "#059669" : 
+                                hasActivePractice ? "#dc2626" : "#6b7280"
+                        }}
+                      >
+                        {hasActivePractice ? "Práctica activa" :
+                         activeApplicationIds.includes(v.id) ? "Ya postulada" :
+                         completedVacancyIds.includes(v.id) ? "Práctica completada anteriormente" :
+                         "Disponible para postularse"}
+                      </span>
+                    </div>
                   </div>
                 </button>
               );
@@ -575,7 +754,11 @@ const applyNow = async (vacancy) => {
             )}
 
             {!loading && !filtered.length && (
-              <div className="jobs-empty small">Sin resultados con esos filtros.</div>
+              <div className="jobs-empty small">
+                {studentProgramId 
+                  ? "Sin resultados con esos filtros." 
+                  : "No hay vacantes disponibles o necesitas configurar tu programa académico."}
+              </div>
             )}
           </aside>
 
@@ -586,7 +769,7 @@ const applyNow = async (vacancy) => {
             {!loading && !selected && (
               <div className="jobs-empty">
                 {studentProgramId
-                  ? "No se encontró la vacante"
+                  ? "Selecciona una vacante para ver los detalles"
                   : "Configura tu programa en el perfil para ver vacantes dirigidas a tu carrera."}
               </div>
             )}
@@ -609,6 +792,34 @@ const applyNow = async (vacancy) => {
                   </div>
                 </header>
 
+                {/* Mensaje de práctica completada anteriormente */}
+                {completedVacancyIds.includes(selected.id) && (
+                  <div style={{
+                    background: "#fffbeb",
+                    border: "1px solid #f59e0b",
+                    borderRadius: "8px",
+                    padding: "12px",
+                    marginBottom: "16px",
+                    textAlign: "center"
+                  }}>
+                    <div style={{ 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "center",
+                      gap: "8px",
+                      marginBottom: "4px"
+                    }}>
+                      <span style={{ fontSize: "20px" }}>🔄</span>
+                      <strong style={{ color: "#d97706", fontSize: "14px" }}>
+                        Ya completaste una práctica aquí anteriormente
+                      </strong>
+                    </div>
+                    <p style={{ margin: 0, color: "#92400e", fontSize: "12px" }}>
+                      Puedes postularte nuevamente a esta vacante
+                    </p>
+                  </div>
+                )}
+
                 <div className="jobs-chips">
                   <span className="jobs-chip">{fmtMod(selected.modality)}</span>
                   <span className="jobs-chip">{fmtComp(selected.compensation)}</span>
@@ -621,7 +832,6 @@ const applyNow = async (vacancy) => {
                   </svg>
                   {selected.location_text || "Ubicación no especificada"}
                 </p>
-
 
                 <hr className="jobs-sep" />
 
@@ -651,13 +861,24 @@ const applyNow = async (vacancy) => {
                 )}
 
                 <div className="jobs-cta">
-                  <button
-                    className="jobs-apply"
-                    disabled={appliedVacancyIds.includes(selected.id)}
-                    onClick={() => applyNow(selected)}
-                  >
-                    {appliedVacancyIds.includes(selected.id) ? "Ya postulada" : "Postularse ahora"}
-                  </button>
+                  {(() => {
+                    const buttonState = getApplyButtonState(selected.id);
+                    return (
+                      <button
+                        className="jobs-apply"
+                        disabled={buttonState.disabled}
+                        onClick={() => applyNow(selected)}
+                        title={hasActivePractice ? "Ya tienes una práctica activa" : ""}
+                        style={{
+                          background: completedVacancyIds.includes(selected.id) ? "#f59e0b" : 
+                                    hasActivePractice ? "#f3f4f6" : "#2563eb",
+                          color: hasActivePractice ? "#6b7280" : "#fff"
+                        }}
+                      >
+                        {buttonState.text}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             )}

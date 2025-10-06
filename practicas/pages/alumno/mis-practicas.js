@@ -4,6 +4,7 @@ import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
 import Navbar from "../../components/navbar";
 import Footer from "../../components/footer";
+import { useActivePractice } from '../../components/hooks/useActivePractice';
 
 // Estados que consideraremos como "completadas" (compararemos en minúsculas)
 const COMPLETED_STATES = ["completada","terminada","finalizada","completed","finished","done"];
@@ -36,27 +37,94 @@ const isPdfUrl = (url) => {
   return url.toLowerCase().endsWith('.pdf') || url.includes('.pdf?');
 };
 
+// Componente de Rating Stars
+function RatingStars({ rating = 0, onRatingChange, interactive = false, size = "medium" }) {
+  const [hoverRating, setHoverRating] = useState(0);
+  
+  const handleClick = (value) => {
+    if (interactive && onRatingChange) {
+      onRatingChange(value);
+    }
+  };
+
+  const handleMouseEnter = (value) => {
+    if (interactive) {
+      setHoverRating(value);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (interactive) {
+      setHoverRating(0);
+    }
+  };
+
+  const displayRating = hoverRating || rating;
+  const starSize = size === "large" ? "32px" : size === "small" ? "16px" : "24px";
+
+  return (
+    <div 
+      className={`rating-stars ${interactive ? 'interactive' : ''}`}
+      style={{ display: 'flex', gap: '4px' }}
+      onMouseLeave={handleMouseLeave}
+    >
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          className={`star ${star <= displayRating ? 'filled' : ''}`}
+          onClick={() => handleClick(star)}
+          onMouseEnter={() => handleMouseEnter(star)}
+          disabled={!interactive}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: interactive ? 'pointer' : 'default',
+            fontSize: starSize,
+            color: star <= displayRating ? '#ffc107' : '#e4e5e9',
+            padding: 0,
+            transition: 'color 0.2s ease'
+          }}
+          aria-label={`Calificar con ${star} estrella${star !== 1 ? 's' : ''}`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function MisPracticasPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
+  // Usar el hook para el estado de práctica activa
+  const { hasActivePractice, loading: practiceLoading } = useActivePractice();
+
   // Usuario / perfil
   const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null); // { full_name, email, program, avatar_url, cv_url }
+  const [profile, setProfile] = useState(null);
   const [cvUploading, setCvUploading] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Listas
   const [favorites, setFavorites] = useState([]);
-  const [applied, setApplied] = useState([]);      // <<< NUEVO: postulaciones activas / historial
+  const [applied, setApplied] = useState([]);
   const [completed, setCompleted] = useState([]);
   const [hidden, setHidden] = useState([]);
   const [showHidden, setShowHidden] = useState(false);
+  const [activePractice, setActivePractice] = useState(null);
 
   // Modal CV
   const [cvOpen, setCvOpen] = useState(false);
 
-  // Forzar recargas (si las llegas a necesitar)
+  // Estados para el sistema de calificación
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState("");
+  const [submittingRating, setSubmittingRating] = useState(false);
+
+  // Forzar recargas
   const refreshKey = useRef(0);
   const bump = () => (refreshKey.current += 1);
 
@@ -116,7 +184,6 @@ export default function MisPracticasPage() {
       if (groupMembers?.group) {
         groupInfo = groupMembers.group;
         
-        // Obtener información del profesor
         const { data: profData } = await supabase
           .from("profiles")
           .select("id, full_name, email")
@@ -130,7 +197,6 @@ export default function MisPracticasPage() {
         id: prof.id,
         full_name: prof.full_name || "(Sin nombre)",
         email: u.email || "",
-        // 👇 importante: sólo en UI aplico cache-busting
         avatar_url: cacheBust(prof.avatar_url || ""),
         cv_url: prof.cv_url || "",
         program: prof.program || null,
@@ -138,7 +204,39 @@ export default function MisPracticasPage() {
         professor: professorInfo
       });
 
-      // 4) Favoritos (vacancy_favorites)
+      // 4) Verificar si tiene práctica activa - sincronizado con el hook
+      if (hasActivePractice) {
+        const { data: activePractice, error: practiceErr } = await supabase
+          .from("practices")
+          .select(`
+            student_id,
+            vacancy:vacancies (
+              id, title, modality, compensation, language,
+              location_text, rating_avg, rating_count, created_at,
+              company:companies ( id, name, logo_url )
+            ),
+            application:applications (
+              id, applied_at, status, decision_at
+            )
+          `)
+          .eq("student_id", u.id)
+          .eq("status", 'active')
+          .single();
+
+        if (practiceErr && practiceErr.code !== 'PGRST116') {
+          console.error("Error loading practice:", practiceErr);
+        }
+
+        if (activePractice?.vacancy) {
+          setActivePractice(activePractice);
+        } else {
+          setActivePractice(null);
+        }
+      } else {
+        setActivePractice(null);
+      }
+
+      // 5) Favoritos
       const { data: favs, error: fErr } = await supabase
         .from("vacancy_favorites")
         .select(`
@@ -164,7 +262,7 @@ export default function MisPracticasPage() {
         .filter((v) => !!v?.id);
       setFavorites(favVacancies);
 
-      // 5) TODAS las aplicaciones del alumno
+      // 6) TODAS las aplicaciones del alumno
       const { data: apps, error: aErr } = await supabase
         .from("applications")
         .select(`
@@ -184,10 +282,8 @@ export default function MisPracticasPage() {
         return;
       }
 
-      // Separa postulaciones activas (no "completadas") y completadas
       const appsClean = (apps || []).filter((r) => r?.vacancy?.id);
       
-      // Filtrar explícitamente las rechazadas
       const appliedList = appsClean
         .filter((r) => {
           const status = String(r.status || "").toLowerCase();
@@ -202,7 +298,7 @@ export default function MisPracticasPage() {
       setCompleted(completedList);
       setApplied(appliedList);
 
-      // 6) Vacantes silenciadas (vacancy_hidden)
+      // 7) Vacantes silenciadas
       const { data: hidd, error: hErr } = await supabase
         .from("vacancy_hidden")
         .select(`
@@ -230,8 +326,60 @@ export default function MisPracticasPage() {
       setLoading(false);
     };
 
-    load();
-  }, [refreshKey.current]);
+    // Solo cargar datos cuando el hook haya terminado de verificar
+    if (!practiceLoading) {
+      load();
+    }
+  }, [refreshKey.current, hasActivePractice, practiceLoading]);
+
+  // Función para finalizar práctica con calificación
+  const handleCompletePractice = async () => {
+    if (selectedRating === 0) {
+      alert("Por favor, selecciona una calificación antes de continuar.");
+      return;
+    }
+
+    setSubmittingRating(true);
+    try {
+      console.log("📤 Enviando calificación:", { userId: user.id, rating: selectedRating });
+      
+      const { data, error } = await supabase.rpc("complete_practice_with_rating", { 
+        p_student_id: user.id,
+        p_rating: selectedRating
+      });
+
+      if (error) {
+        console.error("❌ Error en RPC:", error);
+        throw error;
+      }
+
+      console.log("✅ RPC ejecutada exitosamente");
+      
+      // Disparar evento global para notificar a todos los componentes
+      window.dispatchEvent(new CustomEvent('practiceStatusChanged'));
+      
+      alert("¡Gracias por tu calificación! La práctica ha sido finalizada correctamente.");
+      setShowRatingModal(false);
+      setSelectedRating(0);
+      setRatingComment("");
+      
+      // Forzar recarga COMPLETA de datos
+      console.log("🔄 Recargando datos...");
+      refreshKey.current += 1;
+      setActivePractice(null);
+      
+    } catch (e) {
+      console.error("💥 Error completo:", e);
+      alert(e.message || "No se pudo finalizar la práctica.");
+    } finally {
+      setSubmittingRating(false);
+    }
+  };
+
+  // Función para abrir el modal de calificación
+  const openRatingModal = () => {
+    setShowRatingModal(true);
+  };
 
   // --------- Subir/Reemplazar CV (PDF o imagen) ----------
   const onUploadCv = async (e) => {
@@ -576,6 +724,21 @@ export default function MisPracticasPage() {
     try { return new Date(iso).toLocaleDateString(); } catch { return ""; }
   };
 
+  // Mostrar loading mientras se verifica el estado de práctica activa
+  if (practiceLoading) {
+    return (
+      <>
+        <Navbar />
+        <main className="jobs-wrap" style={{ maxWidth: 1200, marginInline: "auto" }}>
+          <div style={{ textAlign: "center", padding: "50px" }}>
+            <div className="jobs-card sk" />
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
   return (
     <>
       <Navbar />
@@ -726,24 +889,58 @@ export default function MisPracticasPage() {
 
           {/* ---------- Columna derecha: Listas ---------- */}
           <section style={{ display: "grid", gap: 20 }}>
-            {/* Mis postulaciones */}
-            <h2 style={{ textAlign: "center" }}>Mis postulaciones</h2>
-            {loading && <div className="jobs-card sk" />}
-            {!loading && applied.length === 0 && (
-              <div className="jobs-empty small">Aún no te has postulado a ninguna vacante.</div>
+            {activePractice && (
+              <div>
+                <h2 style={{ textAlign: "center", color: "#059669" }}>Proyecto actual</h2>
+                <div style={{ 
+                  border: "2px solid #059669", 
+                  borderRadius: 12, 
+                  padding: 16, 
+                  background: "#f0fdf4",
+                  marginBottom: 20 
+                }}>
+                  <Card
+                    v={activePractice.vacancy}
+                    subtitle={activePractice.application?.decision_at ? 
+                      `Aceptada el ${fmtDate(activePractice.application.decision_at)}` : 
+                      "Práctica en curso"}
+                    actions={chip("Práctica Activa", "success")}
+                  />
+                  <div style={{ 
+                    textAlign: "center", 
+                    marginTop: 12, 
+                    padding: 12,
+                    background: "#dcfce7",
+                    borderRadius: 8
+                  }}>
+                    <strong>¡Estás participando en este proyecto!</strong>
+                    <br />
+                    <span style={{ fontSize: 14, color: "#065f46" }}>
+                      No puedes postularte a otras vacantes mientras tengas un proyecto activo.
+                    </span>
+                    
+                    {/* Botón para finalizar práctica */}
+                    <div style={{ marginTop: 12 }}>
+                      <button
+                        className="jobs-apply"
+                        style={{ 
+                          background: "#dc2626", 
+                          color: "white",
+                          fontSize: "14px",
+                          padding: "8px 16px"
+                        }}
+                        onClick={openRatingModal}
+                      >
+                        Finalizar Práctica
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
-            {!loading &&
-              applied.map((v) => (
-                <Card
-                  key={v.id + (v._applied_at || "")}
-                  v={v}
-                  subtitle={v._applied_at ? `Postulación del ${fmtDate(v._applied_at)}` : null}
-                  actions={chip(`Estado: ${v._app_status || "-"}`, statusTone(v._app_status))}
-                />
-              ))}
 
             {/* Favoritos */}
-            <h2 style={{ textAlign: "center" }}>Proyectos guardados</h2>
+            <h2 style={{ textAlign: "center" }}>Vacantes de interés</h2>
             {loading && <div className="jobs-card sk" />}
             {!loading && favorites.length === 0 && (
               <div className="jobs-empty small">Aún no tienes vacantes guardadas.</div>
@@ -832,6 +1029,86 @@ export default function MisPracticasPage() {
             </div>
           </section>
         </section>
+
+        {/* ----- Modal de Calificación ----- */}
+        {showRatingModal && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,.8)",
+              display: "grid",
+              placeItems: "center",
+              zIndex: 9999,
+              padding: 16,
+            }}
+          >
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 12,
+                padding: 24,
+                maxWidth: 500,
+                width: "100%",
+                boxShadow: "0 10px 30px rgba(0,0,0,.25)",
+              }}
+            >
+              <h2 style={{ textAlign: "center", marginBottom: 16 }}>
+                Califica tu experiencia
+              </h2>
+              
+              <p style={{ textAlign: "center", marginBottom: 24, color: "#6b7280" }}>
+                ¿Cómo calificarías tu experiencia en {activePractice?.vacancy?.company?.name}?
+              </p>
+
+              <div style={{ display: "grid", placeItems: "center", marginBottom: 24 }}>
+                <RatingStars 
+                  rating={selectedRating}
+                  onRatingChange={setSelectedRating}
+                  interactive={true}
+                  size="large"
+                />
+                <p style={{ marginTop: 8, fontSize: 14, color: "#6b7280" }}>
+                  {selectedRating === 0 && "Selecciona una calificación"}
+                  {selectedRating === 1 && "Muy mala experiencia"}
+                  {selectedRating === 2 && "Mala experiencia"}
+                  {selectedRating === 3 && "Experiencia regular"}
+                  {selectedRating === 4 && "Buena experiencia"}
+                  {selectedRating === 5 && "Excelente experiencia"}
+                </p>
+              </div>
+
+              <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                <button
+                  className="jobs-apply"
+                  style={{ 
+                    background: "#e9eef6", 
+                    color: "#1f2937" 
+                  }}
+                  onClick={() => {
+                    setShowRatingModal(false);
+                    setSelectedRating(0);
+                    setRatingComment("");
+                  }}
+                  disabled={submittingRating}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="jobs-apply"
+                  style={{ 
+                    background: selectedRating === 0 ? "#9ca3af" : "#dc2626", 
+                    color: "white" 
+                  }}
+                  onClick={handleCompletePractice}
+                  disabled={selectedRating === 0 || submittingRating}
+                >
+                  {submittingRating ? "Finalizando..." : "Cerrar proyecto"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ----- Modal de CV ampliado ----- */}
         {cvOpen && profile?.cv_url && (
@@ -926,6 +1203,19 @@ export default function MisPracticasPage() {
       </main>
 
       <Footer />
+
+      <style jsx>{`
+        .star {
+          transition: color 0.2s ease;
+        }
+        .star.filled {
+          color: #ffc107;
+        }
+        .rating-stars.interactive .star:hover {
+          color: #ffc107;
+          transform: scale(1.1);
+        }
+      `}</style>
     </>
   );
 }

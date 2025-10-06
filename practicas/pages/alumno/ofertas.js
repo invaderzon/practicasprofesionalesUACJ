@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
 import Navbar from "../../components/navbar";
 import Footer from "../../components/footer";
+import { useActivePractice } from '../../components/hooks/useActivePractice';
 
 /* ---------- UI: mini componentes ---------- */
 function Stars({ rating = 0, compact = false }) {
@@ -47,11 +48,6 @@ function LogoSquare({ src, name }) {
   );
 }
 
-
-
-
-
-
 function splitLines(text) {
   const arr = String(text || "")
     .split(/\r?\n|•|- /)
@@ -87,7 +83,9 @@ export default function OfertasPage() {
   const [err, setErr] = useState("");
 
   const [userId, setUserId] = useState(null);
-  const [hasActivePractice, setHasActivePractice] = useState(false);
+  
+  // USAR EL HOOK EN LUGAR DEL ESTADO LOCAL
+  const { hasActivePractice, loading: practiceLoading } = useActivePractice();
 
   // UI: estado principal
   const [offers, setOffers] = useState([]); // [{appId, applied_at, status, ...vacancy}]
@@ -107,15 +105,6 @@ export default function OfertasPage() {
         if (!user) { router.replace("/login"); return; }
         setUserId(user.id);
 
-        /* ---------- BD: práctica activa ---------- */
-        const { data: prac } = await supabase
-          .from("practices")
-          .select("student_id")
-          .eq("student_id", user.id)
-          .maybeSingle();
-        if (!ignore) setHasActivePractice(!!prac);
-
-        /* ---------- BD: ofertas (applications.status = 'oferta') ---------- */
         /* ---------- BD: ofertas (applications.status = 'oferta') ---------- */
         const { data, error } = await supabase
         .from("applications")
@@ -131,8 +120,6 @@ export default function OfertasPage() {
         .eq("student_id", user.id)
         .eq("status", "oferta")
         .order("applied_at", { ascending: false });
-
-
 
         if (error) throw error;
 
@@ -150,23 +137,48 @@ export default function OfertasPage() {
         if (!ignore) setLoading(false);
       }
     })();
-    return () => { ignore = true; };
+    
+    // Escuchar eventos de cambio de estado de práctica
+    const handlePracticeChange = () => {
+      console.log("🔄 Ofertas - Evento de cambio de práctica recibido");
+    };
+
+    window.addEventListener('practiceStatusChanged', handlePracticeChange);
+
+    return () => { 
+      ignore = true;
+      window.removeEventListener('practiceStatusChanged', handlePracticeChange);
+    };
   }, [router]);
 
   /* ---------- Acciones (BD) ---------- */
-  const acceptOffer = async (appId) => {
-    if (!userId || !appId) return;
-    if (hasActivePractice) { alert("Ya tienes una práctica activa. No puedes aceptar otra."); return; }
-    try {
-      const { error } = await supabase.rpc("student_accept_offer", { p_app_id: appId });
-      if (error) throw error;
-      setOffers(prev => prev.filter(o => o.appId !== appId));
-      router.push("/alumno/mis-practicas");
-    } catch (e) {
-      console.error(e);
-      alert(e.message || "No se pudo aceptar la oferta.");
-    }
-  };
+const acceptOffer = async (appId) => {
+  if (!userId || !appId) return;
+  
+  // USAR EL VALOR DEL HOOK
+  if (hasActivePractice) { 
+    alert("Ya tienes una práctica activa. No puedes aceptar otra oferta."); 
+    return; 
+  }
+  
+  const ok = confirm("¿Aceptar esta oferta?\n\nAl aceptar:\n• Tendrás que contactar con la empresa para acordar tus horarios y obtener información de interés sobre tu nuevo puesto.\n• Se eliminarán tus otras postulaciones activas\n• No podrás postularte a otras vacantes durante tu práctica\n\n¿Continuar?");
+  if (!ok) return;
+  
+  try {
+    const { error } = await supabase.rpc("student_accept_offer", { p_app_id: appId });
+    if (error) throw error;
+    
+    // Disparar evento global para actualizar todos los componentes
+    window.dispatchEvent(new CustomEvent('practiceStatusChanged'));
+    
+    // Redirigir a mis prácticas
+    router.push("/alumno/mis-practicas");
+  } catch (e) {
+    console.error(e);
+    alert(e.message || "No se pudo aceptar la oferta.");
+  }
+};
+
   const declineOffer = async (appId) => {
     if (!userId || !appId) return;
     const ok = confirm("¿Rechazar esta oferta? Esta acción no se puede deshacer.");
@@ -192,6 +204,21 @@ export default function OfertasPage() {
   // Prioriza la dirección de la vacante; si no existe, usa la de la empresa
   const mapAddress = selected?.location_text || selected?.company?.location_text || "";
 
+  // Mostrar loading mientras se verifica el estado de práctica
+  if (practiceLoading) {
+    return (
+      <>
+        <Navbar />
+        <main className="jobs-wrap">
+          <div style={{ textAlign: "center", padding: "50px" }}>
+            <div className="jobs-card sk" />
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
   return (
     <>
       <Navbar />
@@ -199,13 +226,12 @@ export default function OfertasPage() {
       <main className="jobs-wrap">
         {err && <div className="jobs-error">{err}</div>}
 
-        {/* UI: aviso práctica activa */}
+      {/* UI: aviso práctica activa - USAR EL VALOR DEL HOOK */}
         {hasActivePractice && (
           <div className="jobs-error" style={{ background: "#fff7ed", borderColor: "#fed7aa", color: "#9a3412" }}>
             Ya tienes una práctica activa. No puedes aceptar otra oferta por ahora.
           </div>
         )}
-
         <h2 style={{ textAlign: "center", margin: "6px 0 12px" }}>Mis ofertas</h2>
 
         {/* UI: grid principal */}
@@ -329,7 +355,7 @@ export default function OfertasPage() {
                   <button
                     className="jobs-apply"
                     onClick={() => acceptOffer(selected.appId)}
-                    disabled={hasActivePractice}
+                    disabled={hasActivePractice} // USAR EL VALOR DEL HOOK
                     title={hasActivePractice ? "Ya tienes una práctica activa" : "Aceptar oferta"}
                   >
                     Aceptar oferta

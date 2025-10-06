@@ -890,7 +890,7 @@ body {
 .iconbtn:hover{ background:#f7f8fb; }
 
 .iconbtn.active svg {
-  color: var(--color-azul-secundario); /* usa tu variable de color */
+  color: var(--color-azul-secundario); 
   fill: var(--color-azul-secundario);
 }
 
@@ -1162,7 +1162,7 @@ h1 {
   background-size: cover;
   background-position: center;
   border-radius: 1rem;
-  height: 230px; /* altura base, se ajustará con media queries */
+  height: 230px;
   overflow: hidden;
   padding: 20px;
 }
