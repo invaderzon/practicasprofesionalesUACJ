@@ -9,9 +9,9 @@ export default function Footer() {
           </div>
 
           <div className="footer-socials">
-            <a href="https://www.facebook.com/share/1JBeuP9tnL/"><i className="fab fa-facebook-f"></i></a>
-            <a href="https://www.instagram.com/vinculacionuacj?igsh=MWRlZTJkN2kyc3ZpZw=="><i className="fab fa-instagram"></i></a>
-            <a href="https://youtube.com/@tvuacj"><i  className="fab fa-youtube"></i></a>
+            <a href="#"><i className="fab fa-facebook-f"></i></a>
+            <a href="#"><i className="fab fa-instagram"></i></a>
+            <a href="#"><i className="fab fa-youtube"></i></a>
           </div>
 
           <img

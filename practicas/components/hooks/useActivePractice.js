@@ -6,32 +6,54 @@ export function useActivePractice() {
   const [hasActivePractice, setHasActivePractice] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const checkActivePractice = async () => {
+  const checkActivePractice = async () => {
+    try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
+        console.log("🔴 Hook - No hay usuario");
         setHasActivePractice(false);
         setLoading(false);
         return;
       }
 
-      const { data: practice } = await supabase
+      console.log("🔄 Hook - Buscando TODAS las prácticas para usuario:", user.id);
+      
+      // Primero, veamos TODAS las prácticas que tienes
+      const { data: allPractices, error } = await supabase
         .from("practices")
-        .select("id")
+        .select("id, status, student_id, started_at, ended_at")
         .eq("student_id", user.id)
-        .eq("status", "active")
-        .maybeSingle();
+        .order("created_at", { ascending: false });
 
-      console.log("🔄 Hook - Práctica activa:", !!practice);
-      setHasActivePractice(!!practice);
+      if (error) {
+        console.error("❌ Error en hook:", error);
+        setHasActivePractice(false);
+      } else {
+        console.log("📊 Hook - TODAS las prácticas:", allPractices);
+        
+        // Buscar si hay alguna práctica activa
+        const activePractice = allPractices.find(p => p.status === 'active');
+        console.log("🎯 Práctica activa encontrada:", activePractice);
+        
+        console.log("🔍 Estado final del hook - hasActivePractice:", !!activePractice);
+        setHasActivePractice(!!activePractice);
+      }
+    } catch (error) {
+      console.error("💥 Error en hook:", error);
+      setHasActivePractice(false);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
+  useEffect(() => {
+    console.log("🚀 Hook - useEffect ejecutado");
     checkActivePractice();
 
     // Escuchar eventos globales de cambio
     const handlePracticeChange = () => {
-      console.log("📢 Hook - Evento global recibido");
+      console.log("📢 Hook - Evento global recibido, recargando...");
+      setLoading(true);
       checkActivePractice();
     };
 
