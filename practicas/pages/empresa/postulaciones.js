@@ -232,21 +232,31 @@ export default function EmpresaPostulacionesPage() {
     }
   }, [selectedVacancy, selectedStatus, applications, selectedApp]);
 
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'postulada':
+      case 'pendiente':
+        return '#f59e0b'; // amber
+      case 'oferta':
+        return '#3b82f6'; // azul
+      case 'rechazada':
+        return '#ef4444'; // rojo
+      default:
+        return '#6b7280'; // gris
+    }
+  };
+
   const getStatusText = (status) => {
     const statusMap = {
-      'postulada': 'Postulada',
+      'postulada': 'Pendiente',
       'pendiente': 'Pendiente',
-      'revisada': 'Revisada',
-      'entrevista': 'Entrevista',
-      'oferta': 'Oferta enviada',
-      'aceptada': 'Aceptada por alumno',
-      'rechazada': 'Rechazada',
-      'completada': 'Completada',
-      'en_proceso': 'En proceso',
-      'finalizada': 'Finalizada',
-      'retirada': 'Retirada'
+      'revisada': 'Pendiente',
+      'entrevista': 'Pendiente',
+      'oferta': 'Oferta',
+      'aceptada': 'Aceptada',
+      'rechazada': 'Rechazada'
     };
-    return statusMap[status?.toLowerCase()] || 'Postulada';
+    return statusMap[status?.toLowerCase()] || 'Pendiente';
   };
 
   const getStatusBadgeTone = (status) => {
@@ -257,374 +267,51 @@ export default function EmpresaPostulacionesPage() {
       case 'oferta':
         return 'info';
       case 'aceptada':
-      case 'completada':
-      case 'finalizada':
         return 'success';
       case 'rechazada':
-      case 'retirada':
         return 'error';
-      case 'en_proceso':
-        return 'default';
       default:
         return 'muted';
     }
   };
 
   const updateApplicationStatus = async (applicationId, newStatus) => {
-  try {
-    console.log("🔍 [DEBUG] Iniciando actualización:", {
-      applicationId,
-      newStatus,
-      timestamp: new Date().toISOString()
-    });
-
-    // 1. Primero verificar que la aplicación existe y podemos acceder a ella
-    const { data: currentApp, error: fetchError } = await supabase
-      .from("applications")
-      .select("id, status, student_id, vacancy_id")
-      .eq("id", applicationId)
-      .single();
-
-    console.log("🔍 [DEBUG] Aplicación encontrada:", currentApp);
-    console.log("🔍 [DEBUG] Error al buscar:", fetchError);
-
-    if (fetchError) {
-      console.error("❌ Error buscando aplicación:", fetchError);
-      throw new Error(`No se pudo encontrar la aplicación: ${fetchError.message}`);
-    }
-
-    if (!currentApp) {
-      throw new Error("No se encontró la aplicación en la base de datos");
-    }
-
-    // 2. Verificar permisos - que la vacante pertenece a nuestra empresa
-    const { data: { user } } = await supabase.auth.getUser();
-    console.log("🔍 [DEBUG] Usuario actual:", user?.id);
-
-    const { data: vacancyCheck, error: vacancyError } = await supabase
-      .from("vacancies")
-      .select("company_id, companies!inner(owner_id)")
-      .eq("id", currentApp.vacancy_id)
-      .single();
-
-    console.log("🔍 [DEBUG] Verificación de vacante:", vacancyCheck);
-    console.log("🔍 [DEBUG] Error verificación:", vacancyError);
-
-    if (vacancyError || !vacancyCheck) {
-      throw new Error("No tienes permisos para modificar esta aplicación");
-    }
-
-    // 3. Ahora intentar la actualización
-    console.log("🔍 [DEBUG] Intentando actualizar con status:", newStatus);
-    
-    const { data, error } = await supabase
-      .from("applications")
-      .update({ 
-        status: newStatus
-      })
-      .eq("id", applicationId)
-      .select();
-
-    console.log("🔍 [DEBUG] Respuesta de actualización:", {
-      data,
-      error,
-      hasData: !!data,
-      dataLength: data?.length
-    });
-
-    if (error) {
-      console.error("❌ Error de Supabase en actualización:", error);
-      throw error;
-    }
-
-    if (!data || data.length === 0) {
-      // Esto es extraño - la actualización no devolvió datos pero tampoco error
-      console.warn("⚠️ Actualización no devolvió datos pero tampoco error");
-      
-      // Verificar si realmente se actualizó
-      const { data: verifyData } = await supabase
+    try {
+      const { error } = await supabase
         .from("applications")
-        .select("status")
-        .eq("id", applicationId)
-        .single();
-        
-      console.log("🔍 [DEBUG] Verificación post-actualización:", verifyData);
-      
-      if (verifyData && verifyData.status === newStatus) {
-        console.log("✅ Actualización exitosa (verificada)");
-        // Actualizar UI aunque no vengan datos
-        setApplications(prev => prev.map(app => 
-          app.id === applicationId ? { ...app, status: newStatus } : app
-        ));
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", applicationId);
 
-        if (selectedApp && selectedApp.id === applicationId) {
-          setSelectedApp(prev => ({ ...prev, status: newStatus }));
-        }
-        return true;
-      } else {
-        throw new Error("La actualización no se realizó correctamente");
-      }
-    }
+      if (error) throw error;
 
-    console.log("✅ [DEBUG] Actualización exitosa con datos:", data[0]);
-
-    // Actualizar el estado local
-    setApplications(prev => prev.map(app => 
-      app.id === applicationId ? { ...app, status: newStatus } : app
-    ));
-
-    // Actualizar selectedApp si es necesario
-    if (selectedApp && selectedApp.id === applicationId) {
-      setSelectedApp(prev => ({ ...prev, status: newStatus }));
-    }
-
-    return true;
-  } catch (error) {
-    console.error("❌ Error completo actualizando estado:", error);
-    alert(`No se pudo actualizar el estado: ${error.message}`);
-    return false;
-  }
-};
-
-  const createNotificationForStudent = async (studentId, type, title, body) => {
-  try {
-    console.log("📨 [DEBUG] ===== INICIANDO CREACIÓN DE NOTIFICACIÓN =====");
-    
-    // 1. Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    console.log("📨 [DEBUG] Usuario autenticado:", user?.id);
-    
-    if (!user) {
-      console.error("❌ No hay usuario autenticado");
-      return false;
-    }
-
-    // 2. Verificar que el usuario es una empresa
-    const { data: userProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role, full_name')
-      .eq('id', user.id)
-      .single();
-
-    console.log("📨 [DEBUG] Perfil del usuario:", userProfile);
-    
-    if (profileError || userProfile?.role !== 'company') {
-      console.error("❌ Usuario no es una empresa. Rol:", userProfile?.role);
-      return false;
-    }
-
-    // 3. Verificar que existe una empresa asociada
-    const { data: company, error: companyError } = await supabase
-      .from('companies')
-      .select('id, name')
-      .eq('owner_id', user.id)
-      .single();
-
-    console.log("📨 [DEBUG] Empresa del usuario:", company);
-    
-    if (companyError || !company) {
-      console.error("❌ Usuario no tiene empresa asociada");
-      return false;
-    }
-
-    // 4. VERIFICACIÓN CRÍTICA: Asegurar que el studentId es válido
-    console.log("📨 [DEBUG] Verificando studentId:", studentId);
-    
-    const { data: student, error: studentError } = await supabase
-      .from('profiles')
-      .select('id, full_name, role')
-      .eq('id', studentId)
-      .single();
-
-    console.log("📨 [DEBUG] Resultado verificación estudiante:", {
-      student,
-      error: studentError,
-      studentIdProvided: studentId,
-      studentIdFromDB: student?.id,
-      matches: student?.id === studentId
-    });
-
-    if (studentError || !student) {
-      console.error("❌ Estudiante no encontrado:", studentError);
-      return false;
-    }
-
-    if (student.role !== 'student') {
-      console.error("❌ El usuario destino no es un estudiante");
-      return false;
-    }
-
-    // 5. Crear la notificación con datos mínimos
-    console.log("📨 [DEBUG] Insertando notificación...");
-    
-    const notificationData = {
-      student_id: studentId, // Usar el ID verificado
-      type: type,
-      title: title,
-      body: body,
-      action_url: "/alumno/ofertas",
-      created_at: new Date().toISOString()
-    };
-
-    console.log("📨 [DEBUG] Datos de notificación:", notificationData);
-
-    const { data, error } = await supabase
-      .from("notifications")
-      .insert(notificationData)
-      .select();
-
-    console.log("📨 [DEBUG] Respuesta completa:", {
-      data: data?.[0],
-      error: error ? {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint
-      } : null
-    });
-
-    if (error) {
-      console.error("❌ Error de Supabase:", error);
-      return false;
-    }
-
-    if (data && data.length > 0) {
-      console.log("✅ Notificación creada exitosamente. ID:", data[0].id);
-      return true;
-    }
-
-    return false;
-
-  } catch (error) {
-    console.error("❌ Error inesperado:", error);
-    return false;
-  }
-};
-
-
-
-  const handleSendOffer = async (applicationId) => {
-  if (!confirm("¿Enviar oferta a este alumno? Se le notificará para que confirme su aceptación.")) {
-    return;
-  }
-
-  try {
-    console.log("🎯 [DEBUG] ===== INICIANDO ENVÍO DE OFERTA =====");
-    
-    // 1. Obtener los datos COMPLETOS de la aplicación primero
-    console.log("🎯 [DEBUG] Paso 1: Obteniendo datos de aplicación...");
-    const { data: application, error: fetchError } = await supabase
-      .from('applications')
-      .select(`
-        id,
-        student_id,
-        status,
-        vacancies (
-          title,
-          company:companies (
-            name,
-            owner_id
-          )
-        )
-      `)
-      .eq('id', applicationId)
-      .single();
-
-    if (fetchError || !application) {
-      console.error("❌ Error obteniendo aplicación:", fetchError);
-      alert("❌ No se pudo obtener la información de la aplicación.");
-      return;
-    }
-
-    console.log("🎯 [DEBUG] Datos de aplicación:", {
-      applicationId: application.id,
-      studentId: application.student_id,
-      currentStatus: application.status,
-      vacancyTitle: application.vacancies?.title,
-      companyName: application.vacancies?.company?.name,
-      companyOwner: application.vacancies?.company?.owner_id
-    });
-
-    const studentId = application.student_id;
-    const vacancyTitle = application.vacancies?.title || 'la vacante';
-    const companyName = application.vacancies?.company?.name || 'la empresa';
-
-    if (!studentId) {
-      console.error("❌ No hay student_id en la aplicación");
-      alert("❌ No se puede enviar oferta: ID de estudiante no disponible.");
-      return;
-    }
-
-    // 2. Actualizar el estado
-    console.log("🎯 [DEBUG] Paso 2: Actualizando estado de aplicación...");
-    const { data: updateData, error: updateError } = await supabase
-      .from("applications")
-      .update({ 
-        status: 'oferta',
-      })
-      .eq('id', applicationId)
-      .select();
-
-    if (updateError) {
-      console.error("❌ Error actualizando aplicación:", updateError);
-      alert("❌ No se pudo actualizar el estado de la aplicación.");
-      return;
-    }
-
-    console.log("✅ Estado de aplicación actualizado correctamente");
-
-    // 3. Crear notificación
-    console.log("🎯 [DEBUG] Paso 3: Creando notificación...");
-    const notificationSuccess = await createNotificationForStudent(
-      studentId,
-      'offer',
-      '¡Tienes una nueva oferta!',
-      `La empresa ${companyName} te ha enviado una oferta para la vacante "${vacancyTitle}". Revisa tus ofertas para aceptarla o rechazarla.`
-    );
-
-    console.log("🎯 [DEBUG] Resultado final de notificación:", notificationSuccess);
-
-    if (notificationSuccess) {
-      alert("✅ Oferta enviada correctamente. El alumno ha sido notificado.");
-      
-      // Actualizar UI
+      // Actualizar el estado local
       setApplications(prev => prev.map(app => 
-        app.id === applicationId ? { ...app, status: 'oferta' } : app
+        app.id === applicationId ? { ...app, status: newStatus } : app
       ));
 
+      // Actualizar selectedApp si es necesario
       if (selectedApp && selectedApp.id === applicationId) {
-        setSelectedApp(prev => ({ ...prev, status: 'oferta' }));
+        setSelectedApp(prev => ({ ...prev, status: newStatus }));
       }
-    } else {
-      alert("⚠️ Oferta enviada pero hubo un problema con la notificación. El estado se actualizó pero el alumno no recibió notificación.");
+
+    } catch (error) {
+      console.error("Error actualizando estado:", error);
+      alert("No se pudo actualizar el estado.");
     }
+  };
 
-  } catch (error) {
-    console.error("❌ Error completo en handleSendOffer:", error);
-    alert("❌ Error al enviar la oferta: " + error.message);
-  }
-};
+  const handleSendOffer = (applicationId) => {
+    if (confirm("¿Enviar oferta a este alumno?")) {
+      updateApplicationStatus(applicationId, 'oferta');
+    }
+  };
 
-  const handleReject = async (applicationId) => {
-    if (confirm("¿Rechazar esta postulación? Se le notificará al alumno.")) {
-      const success = await updateApplicationStatus(applicationId, 'rechazada');
-      
-      if (success && selectedApp) {
-        // Crear notificación para el alumno
-        await createNotificationForStudent(
-          selectedApp.student.id,
-          'rejected',
-          'Actualización de tu postulación',
-          `Lamentamos informarte que tu postulación para "${selectedApp.vacancy?.title}" en ${selectedApp.vacancy?.company?.name} no ha sido seleccionada.`,
-          // En createNotificationForStudent, después de verificar el estudiante:
-console.log("📨 [DEBUG] Comparando studentId:"),
-console.log("📨 [DEBUG] - studentId recibido:", studentId),
-console.log("📨 [DEBUG] - studentId de BD:", student.id),
-console.log("📨 [DEBUG] - ¿Coinciden?:", studentId === student.id),
-console.log("📨 [DEBUG] - Tipo de studentId:", typeof studentId),
-console.log("📨 [DEBUG] - Tipo de student.id:", typeof student.id)
-        );
-      }
+  const handleReject = (applicationId) => {
+    if (confirm("¿Rechazar esta postulación?")) {
+      updateApplicationStatus(applicationId, 'rechazada');
     }
   };
 
@@ -697,9 +384,8 @@ console.log("📨 [DEBUG] - Tipo de student.id:", typeof student.id)
                   }}
                 >
                   <option value="all">Todos los estados</option>
-                  <option value="postulada">Postulada</option>
-                  <option value="oferta">Oferta enviada</option>
-                  <option value="aceptada">Aceptada por alumno</option>
+                  <option value="postulada">Pendiente</option>
+                  <option value="oferta">Oferta</option>
                   <option value="rechazada">Rechazada</option>
                 </select>
               </div>
@@ -868,40 +554,29 @@ console.log("📨 [DEBUG] - Tipo de student.id:", typeof student.id)
                     </section>
                   )}
 
-                  {/* UI: Acciones según estado - SOLO PARA EMPRESA */}
+                  {/* UI: Acciones según estado */}
                   <section className="jobs-section">
                     <h3>Gestionar Postulación</h3>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {selectedApp.status === 'postulada' ? (
+                      {selectedApp.status === 'postulada' || selectedApp.status === 'pendiente' ? (
                         <>
                           <button
                             className="jobs-apply"
                             onClick={() => handleSendOffer(selectedApp.id)}
                           >
-                            📨 Enviar oferta
+                            Enviar oferta
                           </button>
                           <button
                             className="btn btn-ghost"
                             onClick={() => handleReject(selectedApp.id)}
                           >
-                            ❌ Rechazar
+                            Rechazar
                           </button>
                         </>
                       ) : selectedApp.status === 'oferta' ? (
-                        <div>
-                          <Badge text="Oferta enviada - Esperando respuesta del alumno" tone="info" />
-                          <p style={{ fontSize: 14, color: '#6b7280', marginTop: 8 }}>
-                            El alumno ha sido notificado y debe confirmar si acepta la oferta.
-                          </p>
-                        </div>
-                      ) : selectedApp.status === 'aceptada' ? (
-                        <Badge text="✅ Oferta aceptada por el alumno" tone="success" />
+                        <Badge text="Oferta enviada" tone="info" />
                       ) : selectedApp.status === 'rechazada' ? (
-                        <Badge text="❌ Postulación rechazada" tone="error" />
-                      ) : selectedApp.status === 'en_proceso' ? (
-                        <Badge text="🔄 Práctica en proceso" tone="default" />
-                      ) : selectedApp.status === 'completada' ? (
-                        <Badge text="✅ Práctica completada" tone="success" />
+                        <Badge text="Postulación rechazada" tone="error" />
                       ) : null}
                     </div>
                   </section>
@@ -910,217 +585,6 @@ console.log("📨 [DEBUG] - Tipo de student.id:", typeof student.id)
             </article>
           </section>
         </div>
-
-
-        {/* DIAGNÓSTICO Y PRUEBAS DEL SISTEMA DE NOTIFICACIONES */}
-<div style={{ margin: "20px 0", padding: "15px", background: "#e7f3ff", border: "1px solid #b3d9ff", borderRadius: "8px" }}>
-  <h4 style={{ margin: "0 0 15px 0", color: "#0066cc" }}>🔧 DIAGNÓSTICO DEL SISTEMA DE NOTIFICACIONES</h4>
-  
-  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-    {/* Test 1: Diagnóstico completo */}
-    <button
-      onClick={async () => {
-        console.log("🧪 [DIAGNÓSTICO COMPLETO] Iniciando...");
-        
-        // 1. Verificar usuario
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log("🧪 Usuario actual:", user?.id);
-        
-        if (!user) {
-          alert("❌ No hay usuario autenticado");
-          return;
-        }
-
-        // 2. Verificar perfil
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role, full_name')
-          .eq('id', user.id)
-          .single();
-        console.log("🧪 Perfil:", profile);
-
-        // 3. Verificar empresa
-        const { data: company } = await supabase
-          .from('companies')
-          .select('id, name, owner_id')
-          .eq('owner_id', user.id)
-          .single();
-        console.log("🧪 Empresa:", company);
-
-        // 4. Buscar un estudiante real para probar
-        const { data: student } = await supabase
-          .from('profiles')
-          .select('id, full_name, role')
-          .eq('role', 'student')
-          .limit(1)
-          .single();
-        
-        console.log("🧪 Estudiante de prueba:", student);
-
-        if (student) {
-          // 5. Probar notificación con la función corregida
-          const result = await createNotificationForStudent(
-            student.id,
-            'offer',
-            'TEST - Oferta de prueba',
-            'Esta es una notificación de prueba del sistema de diagnóstico.'
-          );
-          
-          console.log("🧪 Resultado final del diagnóstico:", result);
-          alert(result ? 
-            "✅ Diagnóstico EXITOSO: Notificación creada correctamente" : 
-            "❌ Diagnóstico FALLÓ: Revisa la consola para detalles"
-          );
-        } else {
-          alert("❌ No se encontraron estudiantes para probar");
-        }
-      }}
-      style={{ 
-        background: "#0066cc", 
-        color: "white", 
-        padding: "10px 15px", 
-        border: "none",
-        borderRadius: "6px",
-        cursor: "pointer",
-        fontSize: "14px"
-      }}
-    >
-      🔍 Ejecutar Diagnóstico Completo
-    </button>
-
-    {/* Test 2: Ver notificaciones existentes */}
-    <button
-      onClick={async () => {
-        const { data, error } = await supabase
-          .from('notifications')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(10);
-        
-        if (error) {
-          console.error("Error al obtener notificaciones:", error);
-          alert("❌ Error al obtener notificaciones: " + error.message);
-        } else {
-          console.log("Últimas notificaciones:", data);
-          alert(`📊 Hay ${data?.length || 0} notificaciones en la base de datos. Revisa la consola para ver los detalles.`);
-        }
-      }}
-      style={{ 
-        background: "#28a745", 
-        color: "white", 
-        padding: "10px 15px", 
-        border: "none",
-        borderRadius: "6px",
-        cursor: "pointer",
-        fontSize: "14px"
-      }}
-    >
-      📊 Ver Notificaciones en BD
-    </button>
-
-    {/* Test 3: Test de inserción directa (simplificado) */}
-    <button
-      onClick={async () => {
-        console.log("🧪 [TEST DIRECTO SIMPLIFICADO] Iniciando...");
-        
-        // Usar un estudiante real de la base de datos
-        const { data: student } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .eq('role', 'student')
-          .limit(1)
-          .single();
-
-        if (!student) {
-          alert("❌ No se encontró ningún estudiante en la base de datos");
-          return;
-        }
-
-        console.log("🧪 [TEST] StudentId:", student.id);
-        console.log("🧪 [TEST] Usuario actual...");
-        
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log("🧪 [TEST] Usuario:", user?.id);
-        
-        // Inserción directa pero con verificación
-        console.log("🧪 [TEST] Insertando notificación...");
-        const { data, error } = await supabase
-          .from('notifications')
-          .insert({
-            student_id: student.id,
-            type: 'offer',
-            title: 'TEST DIRECTO SIMPLIFICADO',
-            body: 'Notificación de prueba directa usando estudiante real de la BD',
-            action_url: '/alumno/ofertas',
-            created_at: new Date().toISOString()
-          })
-          .select();
-        
-        console.log("🧪 [TEST] Resultado:", {
-          data: data?.[0],
-          error: error ? {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint
-          } : null
-        });
-        
-        if (error) {
-          alert("❌ Error en test directo: " + error.message + " (Código: " + error.code + ")");
-        } else {
-          alert("✅ Test directo EXITOSO! ID: " + data[0]?.id);
-        }
-      }}
-      style={{ 
-        background: "#dc3545", 
-        color: "white", 
-        padding: "10px 15px", 
-        border: "none",
-        borderRadius: "6px",
-        cursor: "pointer",
-        fontSize: "14px"
-      }}
-    >
-      🧪 Test Inserción Directa
-    </button>
-
-    {/* Test 4: Verificar políticas RLS */}
-    <button
-      onClick={async () => {
-        // Verificar políticas actuales
-        const { data: policies } = await supabase
-          .from('pg_policies')
-          .select('*')
-          .eq('tablename', 'notifications');
-        
-        console.log("🔐 Políticas RLS de notifications:", policies);
-        alert(`🔐 Hay ${policies?.length || 0} políticas RLS para la tabla notifications. Revisa la consola para detalles.`);
-      }}
-      style={{ 
-        background: "#6f42c1", 
-        color: "white", 
-        padding: "10px 15px", 
-        border: "none",
-        borderRadius: "6px",
-        cursor: "pointer",
-        fontSize: "14px"
-      }}
-    >
-      🔐 Verificar Políticas RLS
-    </button>
-  </div>
-
-  <div style={{ marginTop: "15px", fontSize: "12px", color: "#666" }}>
-    <p><strong>Instrucciones:</strong></p>
-    <ol style={{ margin: "5px 0", paddingLeft: "20px" }}>
-      <li>Ejecuta "Diagnóstico Completo" primero para verificar todo el sistema</li>
-      <li>Si falla, usa "Test Inserción Directa" para probar solo la inserción</li>
-      <li>Verifica las notificaciones existentes con el botón verde</li>
-      <li>Revisa la consola del navegador (F12) para logs detallados</li>
-    </ol>
-  </div>
-</div>
       </main>
 
       {/* UI: responsive */}

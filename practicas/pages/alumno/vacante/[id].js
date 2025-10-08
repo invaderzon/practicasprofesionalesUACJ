@@ -114,90 +114,73 @@ export default function VacanteDetallePage() {
   const [activePracticeData, setActivePracticeData] = useState(null);
   const [hasCompletedPracticeForThisVacancy, setHasCompletedPracticeForThisVacancy] = useState(false);
 
-// Obtener usuario y aplicaciones
-useEffect(() => {
-  const boot = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      setUserId(user.id);
+  // Obtener usuario y aplicaciones
+  useEffect(() => {
+    const boot = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
 
-      // CORRECCIÓN: Cargar SOLO aplicaciones con estados activos (en lugar de excluir)
-      const { data: appsData } = await supabase
-        .from("applications")
-        .select("id, vacancy_id, status")
-        .eq("student_id", user.id)
-        .in("status", ["postulada", "en_proceso", "oferta"]) // ← SIN "aceptada"
-        .limit(1000);
-      
-      console.log("📋 Aplicaciones ACTIVAS cargadas:", appsData); // DEBUG
-      
-      if (appsData) {
-        const appliedIds = appsData.map(a => a.vacancy_id);
-        setAppliedVacancyIds(appliedIds);
-        
-        console.log("🆔 IDs de vacantes postuladas ACTIVAS:", appliedIds); // DEBUG
-        console.log("🎯 Vacante actual que estamos viendo:", id); // DEBUG
-        
-        // Verificar si tiene oferta para esta vacante específica
-        if (id) {
-          const offerForThis = appsData.find(app => 
-            app.vacancy_id === id && app.status === 'oferta'
-          );
-          if (offerForThis) {
-            console.log("🎉 Tiene oferta para esta vacante");
-            setHasOfferForThisVacancy(true);
-          }
-
-          // Verificar si ya está postulado a ESTA vacante (cualquier estado activo)
-          const alreadyApplied = appsData.find(app => 
-            app.vacancy_id === id
-          );
-          
-          if (alreadyApplied) {
-            console.log("✅ Ya postulado a esta vacante con estado:", alreadyApplied.status);
-          }
-
-          // Verificar si tiene una práctica COMPLETADA para esta vacante
-          const { data: completedApps } = await supabase
-            .from("applications")
-            .select("id, status")
-            .eq("student_id", user.id)
-            .eq("vacancy_id", id)
-            .in("status", ["completada", "finalizada"])
-            .single();
-
-          if (completedApps) {
-            console.log("🔄 Tiene práctica completada para esta vacante");
-            setHasCompletedPracticeForThisVacancy(true);
-          }
-        }
-      }
-
-      // Cargar datos de la práctica activa si existe
-      if (hasActivePractice) {
-        const { data: practiceData } = await supabase
-          .from("practices")
-          .select("vacancy_id")
+        // Cargar aplicaciones normales (EXCLUYENDO las completadas para la lógica de "ya postulado")
+        const { data: appsData } = await supabase
+          .from("applications")
+          .select("id, vacancy_id, status")
           .eq("student_id", user.id)
-          .eq("status", "active")
-          .single();
+          .not("status", "in", "('completada','terminada','finalizada','completed','finished','done')")
+          .limit(1000);
         
-        if (practiceData) {
-          setActivePracticeData(practiceData);
+        if (appsData) {
+          setAppliedVacancyIds(appsData.map(a => a.vacancy_id));
           
-          // Verificar si está participando en ESTA vacante específica
-          if (id && practiceData.vacancy_id === id) {
-            setIsParticipatingInThisVacancy(true);
-            console.log("🏆 Está participando en esta vacante específica");
+          // Verificar si tiene oferta para esta vacante específica
+          if (id) {
+            const offerForThis = appsData.find(app => 
+              app.vacancy_id === id && app.status === 'oferta'
+            );
+            if (offerForThis) {
+              setHasOfferForThisVacancy(true);
+            }
+
+            // Verificar si tiene una práctica COMPLETADA para esta vacante
+            const { data: completedApps } = await supabase
+              .from("applications")
+              .select("id, status")
+              .eq("student_id", user.id)
+              .eq("vacancy_id", id)
+              .in("status", ["completada", "terminada", "finalizada", "completed", "finished", "done"])
+              .single();
+
+            if (completedApps) {
+              setHasCompletedPracticeForThisVacancy(true);
+            }
+          }
+        }
+
+        // Cargar datos de la práctica activa si existe
+        if (hasActivePractice) {
+          const { data: practiceData } = await supabase
+            .from("practices")
+            .select("vacancy_id")
+            .eq("student_id", user.id)
+            .eq("status", "active")
+            .single();
+          
+          if (practiceData) {
+            setActivePracticeData(practiceData);
+            
+            // Verificar si está participando en ESTA vacante específica
+            if (id && practiceData.vacancy_id === id) {
+              setIsParticipatingInThisVacancy(true);
+              console.log("Está participando en esta vacante específica");
+            }
           }
         }
       }
+    };
+    if (id && !practiceLoading) {
+      boot();
     }
-  };
-  if (id && !practiceLoading) {
-    boot();
-  }
-}, [id, hasActivePractice, practiceLoading]);
+  }, [id, hasActivePractice, practiceLoading]);
 
   // Carga de la vacante
   useEffect(() => {
@@ -278,7 +261,7 @@ useEffect(() => {
         return;
       }
 
-      // Verificar si ya tiene una aplicación ACTIVA para esta vacante
+      // Verificar si ya tiene una aplicación ACTIVA (no completada) para esta vacante
       if (appliedVacancyIds.includes(vacancy.id)) {
         alert("Ya te has postulado a esta vacante.");
         return;
@@ -356,45 +339,21 @@ useEffect(() => {
   });
 
   // Determinar el texto del botón y si está deshabilitado
-  // Determinar el texto del botón y si está deshabilitado
   const getApplyButtonState = () => {
-    const isApplied = appliedVacancyIds.includes(vacancy?.id);
-
-    // DEBUG DETALLADO
-    console.log("🔍 DEBUG COMPLETO del botón:", {
-      vacancyId: vacancy?.id,
-      vacancyTitle: vacancy?.title,
-      isApplied,
-      appliedVacancyIds,
-      hasOfferForThisVacancy,
-      isParticipatingInThisVacancy,
-      hasActivePractice,
-      hasCompletedPracticeForThisVacancy,
-      spotsLeft: vacancy?.spots_left,
-      applyLoading
-    });
-
     if (isParticipatingInThisVacancy) {
-      console.log("🏆 Caso 1: Participando en esta vacante");
       return { text: "✅ Ya estás participando en este proyecto", disabled: false, action: goToMyPractices };
     } else if (hasActivePractice) {
-      console.log("⏸️ Caso 2: Tiene práctica activa en otra vacante");
       return { text: "⏸️ Ya estás participando en otro proyecto", disabled: true, action: null };
     } else if (hasOfferForThisVacancy) {
-      console.log("🎉 Caso 3: Tiene oferta para esta vacante");
       return { text: "🎉 ¡Tienes una oferta! Revisar oferta", disabled: false, action: goToOffers };
-    } else if (isApplied) {
-      console.log("✅ Caso 4: Ya postulado a esta vacante");
-      return { text: "✅ Ya postulada", disabled: true, action: null };
+    } else if (appliedVacancyIds.includes(vacancy?.id)) {
+      return { text: "Ya postulada", disabled: true, action: null };
     } else if (vacancy?.spots_left <= 0) {
-      console.log("❌ Caso 5: Cupos agotados");
-      return { text: "❌ Cupos agotados", disabled: true, action: null };
+      return { text: "Cupos agotados", disabled: true, action: null };
     } else if (hasCompletedPracticeForThisVacancy) {
-      console.log("🔄 Caso 6: Tuvo práctica completada anteriormente");
-      return { text: "🔄 Postularse nuevamente", disabled: false, action: onApply };
+      return { text: "Postularse nuevamente", disabled: false, action: onApply };
     } else {
-      console.log("📝 Caso 7: Postulación normal");
-      return { text: applyLoading ? "Enviando..." : "📝 Postularse ahora", disabled: applyLoading, action: onApply };
+      return { text: applyLoading ? "Enviando..." : "Postularse ahora", disabled: applyLoading, action: onApply };
     }
   };
 
