@@ -256,9 +256,8 @@ export default function EstudiantesPage() {
       
       if (!ignore && appsData) {
         // ✅ CORREGIDO: Usar los valores exactos del ENUM application_status
-        // Basado en: DEFAULT 'postulada'::application_status
-        const ACTIVE_STATUSES = ["postulada", "en_revision", "oferta", "aceptada"];
-        const COMPLETED_STATUSES = ["completada", "terminada", "finalizada"];
+        const ACTIVE_STATUSES = ["postulada", "en_revision", "oferta"]; 
+        const COMPLETED_STATUSES = ["completada", "terminada", "finalizada", "aceptada"]; 
         
         console.log("📊 Todas las aplicaciones:", appsData.map(app => ({ 
           vacancy_id: app.vacancy_id, 

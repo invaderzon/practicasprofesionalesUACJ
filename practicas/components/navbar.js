@@ -256,91 +256,117 @@ export default function Navbar() {
 
 
 /* =======================
-   🔔 Componente Notificaciones (global)
+   🔔 Componente Notificaciones (global) - VERSIÓN CORREGIDA
    ======================= */
 function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [unread, setUnread] = useState(0);
-  const [items, setItems] = useState([]); // {id, type, title, body, action_url, created_at, read_at, ...}
+  const [items, setItems] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const panelRef = useRef(null);
   const btnRef = useRef(null);
   const router = useRouter();
 
-  // Cargar notificaciones al montar
+  // Obtener el usuario actual
   useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+        console.log("🔑 Usuario actual:", user.id);
+      }
+    };
+    getCurrentUser();
+  }, []);
+
+  // Cargar notificaciones
+  useEffect(() => {
+    if (!currentUserId) return;
+
     let ignore = false;
 
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || ignore) return;
+    const loadNotifications = async () => {
+      try {
+        console.log("📨 Cargando notificaciones para:", currentUserId);
+        
+        // 1) Obtener lista de notificaciones
+        const { data: list, error } = await supabase
+          .from("notifications")
+          .select(`
+            id,
+            type,
+            title,
+            body,
+            action_url,
+            created_at,
+            read_at
+          `)
+          .eq("student_id", currentUserId)
+          .order("created_at", { ascending: false })
+          .limit(20);
 
-      // 1) Unread count
-      const { data: unreadRows } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: false })
-        .eq("student_id", user.id)
-        .is("read_at", null);
+        if (error) {
+          console.error("❌ Error cargando notificaciones:", error);
+          return;
+        }
 
-      setUnread((unreadRows || []).length);
-      
-const { data: list, error } = await supabase
-      .from("notifications")
-      .select(`
-        id,
-        type,
-        title,
-        body,
-        action_url,
-        created_at,
-        read_at
-      `)
-      .eq("student_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(20);
+        console.log("✅ Notificaciones encontradas:", list?.length || 0);
 
-    if (error) console.error("notifications list error:", error);
-    if (!ignore && list) setItems(list);
+        if (!ignore && list) {
+          setItems(list);
+          // Calcular no leídas
+          const unreadCount = list.filter(item => !item.read_at).length;
+          setUnread(unreadCount);
+          console.log("🔴 No leídas:", unreadCount);
+        }
+      } catch (e) {
+        console.error("❌ Error general:", e);
+      }
+    };
 
-    })();
+    loadNotifications();
 
-    // Realtime: nuevas notificaciones al vuelo
-    let channel;
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      channel = supabase
-        .channel(`notif_user_${user.id}`)
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "notifications", filter: `student_id=eq.${user.id}` },
-          (payload) => {
-            const n = payload.new;
-            setItems((prev) => [n, ...prev].slice(0, 20));
-            setUnread((u) => u + 1);
-            // pequeña animación de “ping” en el badge por CSS (ver .notif-ping class)
-            try {
-              btnRef.current?.classList.add("notif-ping");
-              setTimeout(() => btnRef.current?.classList.remove("notif-ping"), 600);
-            } catch {}
+    // Suscripción realtime
+    const channel = supabase
+      .channel(`notif_user_${currentUserId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `student_id=eq.${currentUserId}`
+        },
+        (payload) => {
+          console.log("🎯 Nueva notificación realtime:", payload.new);
+          const n = payload.new;
+          setItems((prev) => [n, ...prev].slice(0, 20));
+          setUnread((u) => u + 1);
+          
+          // Efecto visual
+          if (btnRef.current) {
+            btnRef.current.classList.add("notif-ping");
+            setTimeout(() => btnRef.current.classList.remove("notif-ping"), 600);
           }
-        )
-        .subscribe();
-    })();
+        }
+      )
+      .subscribe();
 
     return () => {
       ignore = true;
-      if (channel) supabase.removeChannel(channel);
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [currentUserId]);
 
-  // Abrir/cerrar con animación
+  // Abrir/cerrar panel
   const openPanel = () => { setClosing(false); setOpen(true); };
   const closePanel = () => {
     if (!open && !closing) return;
     setClosing(true);
     setTimeout(() => { setOpen(false); setClosing(false); }, 220);
   };
+  
   const togglePanel = async () => {
     if (open && !closing) {
       closePanel();
@@ -348,40 +374,43 @@ const { data: list, error } = await supabase
     }
     openPanel();
 
-    // Al abrir, marca todo como leído
+    // Marcar como leído al abrir
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      if (unread > 0) {
-        const nowIso = new Date().toISOString();
-        const { error } = await supabase
-          .from("notifications")
-          .update({ read_at: nowIso })
-          .eq("student_id", user.id)
-          .is("read_at", null);
-        if (error) console.error("mark read error:", error);
+      if (!currentUserId || unread === 0) return;
+      
+      const nowIso = new Date().toISOString();
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read_at: nowIso })
+        .eq("student_id", currentUserId)
+        .is("read_at", null);
+      
+      if (!error) {
         setUnread(0);
-        setItems((prev) => prev.map((x) => ({ ...x, read_at: x.read_at || nowIso })));
+        setItems(prev => prev.map(item => ({ 
+          ...item, 
+          read_at: item.read_at || nowIso 
+        })));
       }
     } catch (e) {
-      console.error(e);
+      console.error("Error marcando como leído:", e);
     }
   };
 
-  // Cerrar al hacer click fuera / ESC
+  // Cerrar al hacer click fuera
   useEffect(() => {
     if (!open && !closing) return;
+    
     const onClickOutside = (e) => {
-      if (!panelRef.current || !btnRef.current) return;
-      if (
-        panelRef.current.contains(e.target) ||
-        btnRef.current.contains(e.target)
-      ) return;
+      if (panelRef.current?.contains(e.target) || btnRef.current?.contains(e.target)) return;
       closePanel();
     };
+    
     const onEsc = (e) => { if (e.key === "Escape") closePanel(); };
+    
     document.addEventListener("mousedown", onClickOutside);
     document.addEventListener("keydown", onEsc);
+    
     return () => {
       document.removeEventListener("mousedown", onClickOutside);
       document.removeEventListener("keydown", onEsc);
@@ -390,8 +419,7 @@ const { data: list, error } = await supabase
 
   const goAction = (url) => {
     closePanel();
-    if (!url) return;
-    router.push(url);
+    if (url) router.push(url);
   };
 
   return (
@@ -401,59 +429,59 @@ const { data: list, error } = await supabase
         className="btn-usuario notif-btn"
         onClick={togglePanel}
         aria-label="Notificaciones"
-        aria-expanded={open ? "true" : "false"}
+        aria-expanded={open}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-          <path
-            fill="currentColor"
-            d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2m6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1z"
-          />
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path fill="currentColor" d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2m6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1z"/>
         </svg>
         {unread > 0 && <span className="badge">{unread}</span>}
       </button>
 
       {(open || closing) && (
         <>
-          {/* overlay solo en móvil */}
           <div className={`notif-overlay ${open ? "open" : ""}`} onClick={closePanel} />
-
           <div
             ref={panelRef}
-            className={`notif-panel ${closing ? "closing" : (open ? "open" : "")}`}
+            className={`notif-panel ${closing ? "closing" : open ? "open" : ""}`}
             role="dialog"
             aria-label="Notificaciones"
           >
             <header className="notif-head">
               <h4>Notificaciones</h4>
-              {items.length > 0 ? (
-                <span className="notif-sub">{items.filter(i => !i.read_at).length} sin leer</span>
-              ) : null}
+              {items.length > 0 && (
+                <span className="notif-sub">
+                  {items.filter(i => !i.read_at).length} sin leer
+                </span>
+              )}
             </header>
 
             <div className="notif-list">
-              {items.length === 0 && (
+              {items.length === 0 ? (
                 <div className="notif-empty">No tienes notificaciones todavía.</div>
-              )}
-
-              {items.map((n) => (
-                <article key={n.id} className={`notif-item ${!n.read_at ? "is-unread" : ""}`}>
-                  <div className={`notif-ico ${n.type}`}>
-                    {iconForType(n.type)}
-                  </div>
-                  <div className="notif-body">
-                    <div className="notif-title">{n.title || prettyTitleFromType(n.type)}</div>
-                    {n.body ? <div className="notif-text">{n.body}</div> : null}
-                    <div className="notif-meta">
-                      <time dateTime={n.created_at}>{timeAgo(n.created_at)}</time>
-                      {n.action_url && (
-                        <button className="notif-action" onClick={() => goAction(n.action_url)}>
-                          Ver detalle
-                        </button>
-                      )}
+              ) : (
+                items.map((n) => (
+                  <article key={n.id} className={`notif-item ${!n.read_at ? "is-unread" : ""}`}>
+                    <div className={`notif-ico ${n.type}`}>
+                      {iconForType(n.type)}
                     </div>
-                  </div>
-                </article>
-              ))}
+                    <div className="notif-body">
+                      <div className="notif-title">{n.title}</div>
+                      {n.body && <div className="notif-text">{n.body}</div>}
+                      <div className="notif-meta">
+                        <time>{timeAgo(n.created_at)}</time>
+                        {n.action_url && (
+                          <button 
+                            className="notif-action" 
+                            onClick={() => goAction(n.action_url)}
+                          >
+                            Ver detalle
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
           </div>
         </>
