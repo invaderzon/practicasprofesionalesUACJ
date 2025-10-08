@@ -38,7 +38,7 @@
   }
 
 .nav-title {
-  width: 80%;
+  width: 60%;
   padding: 0.3rem 0.6rem;
   cursor: pointer;
   }
@@ -102,6 +102,13 @@
 
 
 @media (max-width: 768px){
+
+  .nav-title {
+    width: auto;
+    font-weight: bolder;
+    text-align: center;
+    font-size: 1.6rem;
+  }
   /* Botón hamburguesa visible */
   .menu-toggle{ display:flex; }
 
@@ -129,12 +136,12 @@
     opacity:1;
     transform: translateY(0);
     padding-top:.5rem;
-    padding-bottom:1rem;
   }
 
   /* Estética de los links apilados */
   .nav-links a{
-    display:block;
+    display:flex;
+    align-self: end;
     padding:.6rem .75rem;
     border-radius:.5rem;
   }
@@ -208,7 +215,7 @@
 }
 .nav-portal .tab.activa{
   --alza: .5rem;
-  background-color: var(--color-fondo);
+  background: var(--color-fondo);
   color: var(--color-principal);
   margin-top: calc(var(--alza) * -1);
   padding-top: calc(.625rem + var(--alza));
@@ -301,6 +308,7 @@
   height: 40px;
   flex: 0 0 40px;          /* no se encoje */
   border-radius: 50%;
+  
   background: linear-gradient(145deg,#7ea0c8,#3d5a86);
   border: 1px solid #dbe1ea;
 }
@@ -323,12 +331,12 @@
 
 .nav-portal .menu-usuario .datos .email{
   display:block;
-  font-size: .8rem;
+  font-size: .5rem;
   color: #6b7280;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 220px; /* ajusta si quieres */
+  max-width: 200px; /* ajusta si quieres */
 }
 
 
@@ -645,7 +653,8 @@
 
 
 
-
+/* =============== FOOTER =================== */
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/brands.min.css");
 
 .footer {
   background-color: #14294b; /* azul oscuro */
@@ -693,6 +702,12 @@
   color: #fff;
   text-decoration: none;
 }
+.footer-socials i {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  color: white;
+}
 
 .logo-vinculacion {
   margin-top: 1rem;
@@ -737,4 +752,40 @@
   text-align: right;
   padding: 1rem;
   font-size: 0.85rem;
+}
+
+@media (max-width: 978px) {
+  .footer-links {
+    flex: 3 1 200px;
+  }
+}
+
+@media (max-width: 768px){
+  .footer-bottom {
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 620px) {
+  .footer-left {
+    max-width: 620px;
+    margin: auto;
+    margin-bottom: 2rem;
+  }
+
+  .logo-uacj {
+    width: 100%;
+    height: auto;
+  }
+  .logo-vinculacion {
+    width: 50%;
+    height: auto;
+  }
+}
+
+@media (max-width: 320px) {
+  .notif-wrap {
+    display: none;
+  }
+
 }

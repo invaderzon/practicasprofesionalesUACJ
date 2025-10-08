@@ -7,8 +7,6 @@
   --color-azul-secundario: #2563eb;
   --color-azul-oscuro: #1f2937;
   --alto-navbar: 64px;
-  --inactive: #c0c8d6;
-  --inactive-contrast: #6870aa;
 }
 
 /* Reset básico y fondo general */
@@ -30,15 +28,7 @@ body {
   margin-top: 3rem;
 }
 
-@media (max-width: 600px) {
-  .Contenedor{
-    width: 80%;
-  }
 
-  .root{
-    --alto-navbar:40px;
-  }
-  }
 
 /*-------------------------------------------------*/
 /*--------------------SLIDER-----------------------*/
@@ -220,21 +210,7 @@ body {
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .card { height: 250px; }
-  .card-overlay h3 { font-size: 1rem; }
-  .card-overlay p { font-size: 0.8rem; }
-}
 
-@media (max-width: 500px) {
-  .card { height: 200px; }
-  .card-overlay h3 { font-size: 0.9rem; }
-  .card-overlay p { font-size: 0.7rem; }
-  .cards-section {
-    grid-template-columns: 1fr; /* todas en columna */
-    gap: 1rem;
-  }
-}
 
 /*-------------------------------------------------*/
 /*------------------EMPRESAS----------------------*/
@@ -248,11 +224,11 @@ body {
 }
 
 .logo-card {
-  width: auto;
-  height: 120px;
+  max-width: 150px;
+  max-height: 120px;
   border-radius: 12px;
   background-color: var(--color-texto-blanco);
-  background-size: contain;
+  background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
   display: flex;
@@ -267,12 +243,7 @@ body {
   box-shadow: 0 0px 0px rgba(0,0,0,0.08); 
 }
 
-@media (max-width: 600px) {
-  .cards-section.empresas {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-}
+
 
 
 /*-------------------------------------------------*/
@@ -393,36 +364,6 @@ body {
   color: var(--color-texto-blanco);
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .section-container-fondo-imagen {
-    min-height: 250px;
-  }
-
-  .section-container-fondo-imagen h2 {
-    font-size: 1.5rem;
-  }
-
-  .section-container-fondo-imagen p {
-    font-size: 0.9rem;
-  }
-}
-
-@media (max-width: 500px) {
-  .section-container-fondo-imagen {
-    min-height: 200px;
-  }
-
-  .section-container-fondo-imagen .overlay {
-    padding: 1rem;
-  }
-
-  .btn-leer-mas {
-    font-size: 0.9rem;
-    padding: 0.6rem 1.2rem;
-  }
-}
-
 
 /*-----------------------------------------------------------*/
 /*--------------------Info relacionada-----------------------*/
@@ -454,15 +395,7 @@ body {
   transform: translateY(-5px) scale(1.02);
 }
 
-/* Responsive */
-@media (max-width: 600px) {
-  .card-title {
-    font-size: 1.1rem;
-  }
-  .info-panel.open {
-    max-height: 300px; /* más espacio en móviles */
-  }
-}
+
 
 /*-----------------------------------------------------------*/
 /*----------- Animación bonita para InfoPanel ---------------*/
@@ -720,6 +653,12 @@ body {
   .login-left{ min-height: 160px; }
 }
 
+@media (max-width: 600px) {
+  .login-wrap {
+    padding: 0;
+  }
+}
+
 /*-----------------------------------------------------------*/
 /*-------------------- Página: Estudiantes ------------------*/
 
@@ -796,7 +735,7 @@ body {
 .jobs-card-left{ width:6px; border-radius: 12px 0 0 12px; background: transparent; flex: 0 0 6px; }
 .jobs-card.is-active .jobs-card-left{ background:var(--color-azul-secundario); }
 
-.jobs-card-body{ flex:1; padding: 12px 12px 10px; }
+.jobs-card-body{ flex:1; padding: 12px 12px 1.5rem; }
 .jobs-card-top{ display:flex; align-items:center; gap:10px; }
 
 .jobs-logo{ width:40px; height:40px; border-radius:8px; border:1px solid #e6eaf1; overflow:hidden; background:#f7f8fb; }
@@ -848,7 +787,7 @@ body {
 
 .jobs-cta{ margin: 12px 0 6px; }
 .jobs-apply{
-  border:none; background: var(--color-azul-secundario); color:#fff; border-radius:8px;
+  border:none; background: var(--color-principal); color:#fff; border-radius:8px;
   padding: 10px 14px; cursor:pointer; font-weight:600;
 }
 .jobs-apply:hover{ filter: brightness(.95); }
@@ -890,7 +829,7 @@ body {
 .iconbtn:hover{ background:#f7f8fb; }
 
 .iconbtn.active svg {
-  color: var(--color-azul-secundario); 
+  color: var(--color-azul-secundario); /* usa tu variable de color */
   fill: var(--color-azul-secundario);
 }
 
@@ -973,7 +912,7 @@ body {
 .avatar-box{
   width:96px; height:96px; border-radius:12px; border:1px solid #e6eaf1; overflow:hidden; background:#f7f8fb;
 }
-.avatar-box img{ width:100%; height:100%; object-fit:cover; display:block; }
+.avatar-box img{ width:100%; height:100%; object-fit:cover; display:block;}
 .file-hidden{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(1px,1px,1px,1px); }
 
 
@@ -1038,6 +977,18 @@ body {
   padding:10px 12px; color:#1f2937;
 }
 
+/* Botones utilitarios (reusa tus estilos) */
+.btn{
+  border:none; border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:700;
+}
+.btn-primary{ background: var(--color-azul-secundario); color:#fff; }
+.btn-primary:hover{ filter:brightness(.95); }
+.btn-ghost{ background:#fff; border:1px solid #e6eaf1; color:#1f2937; }
+.btn-ghost:hover{ background:#f7f8fb; }
+.btn-danger{ background:#b91c1c; color:#fff; }
+.file-hidden{ display:none; }
+.actions-row{ display:flex; gap:8px; flex-wrap:wrap; }
+
 /* Tips box */
 .tips-box{ margin-top:16px; border-top:1px solid #eef1f6; padding-top:12px; }
 .tips-title{ font-size:12px; font-weight:700; color:#1f2937; margin-bottom:6px; }
@@ -1055,7 +1006,6 @@ body {
 
 
 /*-------------------- Página: Prácticas ------------------*/
-
 .contenedorBanner{
   width: 100%;
   height: 700px;
@@ -1086,17 +1036,12 @@ h1 {
 
 
 .two-columns {
-  width: 800px;
-  overflow: hidden;
-  margin: 100px auto 0;
+  margin: 100px auto 50px;
   color: #000;
-  
-
 }
 
 .info-card-one {
   width: 100%;
-  height: 400px;
   display: grid;
   grid-template-columns: 1fr 1.6fr;
   margin: 2rem auto;
@@ -1105,14 +1050,12 @@ h1 {
 
 .info-img{
   width: 100%;
-  height: 400px;
-  display: grid;
+  display: flex;
 }
 .texto-info {
   padding: 2rem;
   background: var(--color-texto-blanco);
   border-radius: 16px;
-  display: grid;
 }
 
 .texto-info h2 {
@@ -1130,13 +1073,11 @@ h1 {
   height: 100%;
   background-size:cover;
   background-repeat: no-repeat;
-  display: block;
   border-radius: 16px;
 }
 
 .info-card-two {
   width: 100%;
-  height: 400px;
   display: grid;
   grid-template-columns: 1.6fr 1fr;
   margin: 2rem auto;
@@ -1153,18 +1094,16 @@ h1 {
   width: 100%;
   margin: 0 auto;
 }
-#tips {
-  width: 80%;
-}
 .card-info {
   background-color: var(--color-principal);
   position: relative;
   background-size: cover;
   background-position: center;
   border-radius: 1rem;
-  height: 230px;
-  overflow: hidden;
+  height: 250px; /* altura base, se ajustará con media queries */
   padding: 20px;
+  padding-bottom: 1rem;
+  overflow: scroll;
 }
 .card-info h3{
   font-size: 1.4rem;
@@ -1202,6 +1141,7 @@ h1 {
   cursor: pointer;
   transition: all 0.3s ease;
   margin-top: 20px;
+  font-weight: bolder;
 }
 
 .portal-estudiante:hover {
@@ -1212,1227 +1152,135 @@ h1 {
 }
 
 /*--------------------------------------------------------*/
-/*-----------------------LOGOS EMPRESAS---------------------------------*/
 
-.jobs-logo-fallback {
-  width: 40px;
-  height: 40px;
-  background: #e5e7eb;
-  color: #374151;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-}
-
-
-/*--------------------------------------------------------*/
-/* ---------------------PROFESOR-------------------------- */
-
-.jobs-searchbar.prof-search{
-  max-width: 640px;
-  margin: 12px auto 18px;
-}
-
-.prof-layout{
-  display:grid;
-  grid-template-columns: 420px 420px;
-  gap: 18px;
-  justify-content: center; 
-  align-items: start;
-}
-
-.prof-panel{
-  background:#fff;
-  border:1px solid #e4e7ee;
-  border-radius:12px;
-  padding:18px 20px;
-  box-shadow: 0 4px 16px rgba(0,0,0,.06);
-}
-
-.prof-photo{
-  width: 120px;
-  height: 120px;
-  border-radius: 999px;
-  background: #e9eef6;
-  margin: 6px auto 10px;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-}
-
-.prof-avatar-fallback{
-  width:100%; height:100%;
-  border-radius:999px;
-  background:#e5e7eb;
-  color:#374151;
-  display:grid; place-items:center;
-  font-weight:800; font-size:32px;
-}
-
-.prof-name{
-  margin: 6px 0 2px;
-  text-align:center;
-  font-size: 18px;
-  color: var(--color-principal);
-}
-
-.prof-mail{
-  text-align:center;
-  color:#374151;
-  font-size: 13px;
-  margin-bottom: 6px;
-}
-
-.prof-info{
-  font-size: 13px;
-  color:#111827;
-  margin-top: 6px;
-  line-height: 1.35;
-}
-.prof-info strong{ font-weight:700; }
-
-.prof-actions{
-  display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px;
-}
-.prof-edit-row{ margin-top: 10px; }
-.prof-edit-form{ display:grid; gap:8px; margin-top: 10px; }
-.prof-input{
-  padding:10px 12px;
-  border:1px solid #d1d5db;
-  border-radius:10px;
-  background:#fff;
-  outline:none;
-  font-size:14px;
-}
-
-
-.prof-groups{
-  display:flex;
-  flex-direction:column;
-  gap: 12px;
-}
-
-
-.group-item{
-  display:flex;
-  align-items:center;
-  gap: 10px;
-  background:#fff;
-  border:1px solid #e4e7ee;
-  border-radius:10px;
-  padding: 12px 12px;
-  width:100%;
-  box-shadow: 0 2px 8px rgba(0,0,0,.05);
-  cursor:pointer;
-  text-align:left;
-  position: relative;
-}
-.group-item:hover{ transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
-
-.grp-color{
-  width: 16px;
-  height: 44px;
-  border-radius: 8px;
-  flex: 0 0 16px;
-  background: var(--color-principal);
-}
-
-.grp-body{ flex:1; display:flex; flex-direction:column; line-height:1.2; }
-.grp-title{ color:#111827; font-weight:700; font-size: 13.5px; }
-.grp-sub{ color:#6b7280; font-size: 12px; margin-top: 2px; }
-
-/* Botón de tres puntos + menú */
-.grp-kebab{ position: relative; }
-.grp-kebab-btn{
-  background:none; border:none; cursor:pointer;
-  font-size: 20px; line-height: 18px; color:#374151;
-  padding: 4px 6px; border-radius: 8px;
-}
-.grp-kebab-btn:hover{ background:#f7f8fb; }
-
-.grp-menu-pop{
-  position:absolute;
-  right:0;
-  top: calc(100% + 6px);
-  background:#fff;
-  border:1px solid #e6eaf1;
-  border-radius:10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.12);
-  padding:6px;
-  z-index:5;
-  min-width: 190px;
-}
-.menu-item{
-  width:100%;
-  text-align:left;
-  background:transparent;
-  border:none;
-  padding:8px 10px;
-  border-radius:8px;
-  color:#1f2937;
-  cursor:pointer;
-  font-size: 14px;
-}
-.menu-item:hover{ background:#f7f8fb; }
-.menu-item.danger{ color:#b91c1c; }
-
-.group-editor{
-  background:#fff; border:1px solid #e4e7ee; border-radius:10px; padding:12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.05);
-}
-.group-editor .row{
-  display:flex; align-items:center; gap:10px; margin-bottom:8px;
-}
-.color-input{
-  width: 16px;
-  height: 44px; 
-  border-radius:8px; 
-  padding:0;
-}
-
-
-@media (max-width: 960px){
-  .prof-layout{
-    grid-template-columns: 1fr;
-    gap: 14px;
-    padding-inline: 8px;
+/*---------------------- RESPONSIVE --------------------------*/
+@media (max-width: 1024px) {
+  .cards-section {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
   }
-}
 
-.alumno-avatar-fallback {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: #e5e7eb;
-  color: #374151;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 14px;
-}
-
-
-/* Botón “agregar” siempre arriba */
-.add-sticky{
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  background: transparent;
-  padding-bottom: 8px;
-}
-
-/* Formulario inline */
-.add-form{
-  background:#fff; border:1px solid #e6eaf1; border-radius:12px; padding:12px;
-  box-shadow: 0 2px 10px rgba(0,0,0,.06);
-}
-.add-title{
-  margin: 0 0 8px 0;
-  color: var(--color-principal);
-  font-size: 16px; font-weight: 800;
-}
-.add-results{
-  display: grid; gap: 6px; margin-top: 8px;
-  max-height: 220px; overflow: auto;
-}
-.result-item{
-  display:flex; align-items:center; gap:10px;
-  border:1px solid #e6eaf1; background:#fff; border-radius:10px; padding:8px 10px;
-  cursor:pointer; text-align:left;
-}
-.result-item:hover{ background:#f7f8fb; }
-.result-texts{ min-width:0; }
-.r-name{ font-weight:700; color:#1f2937; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.r-sub{ font-size:12px; color:#6b7280; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-
-.preview-card{
-  border:1px solid #e6eaf1; background:#fff; border-radius:12px; padding:12px; margin-top:10px;
-}
-.prev-row{ display:flex; align-items:center; gap:12px; }
-.prev-name{ font-weight:800; color:#1f2937; }
-.prev-sub{ color:#6b7280; font-size:13px; }
-.prev-pill{
-  display:inline-block; margin-top:4px; font-size:12px; background:#f8fafc; border:1px solid #e6eaf1;
-  color:#475569; padding:4px 8px; border-radius:999px;
-}
-.prev-link{ display:inline-block; margin-left:8px; font-size:12px; color:#1e40af; text-decoration:underline; }
-.prev-note{
-  margin-top:8px; font-size:12px; color:#1f3354; background:#eaf2ff;
-  border:1px solid #cfe0ff; border-radius:8px; padding:6px 8px;
-}
-.prev-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
-
-.alumno-avatar-fallback{
-  border-radius:50%;
-  background:#e5e7eb;
-  color:#374151;
-  display:grid; place-items:center;
-  font-weight:800;
-}
-
-.group-new-card .jobs-card-body {
-  min-height: 72px;
-  display: grid;
-  place-items: center;
-}
-.group-new-icon {
-  display: grid;
-  place-items: center;
-  width: 36px; height: 36px;
-  border-radius: 999px;
-  border: 2px solid #cbd5e1;
-  background: transparent;
-  font-weight: 800;
-  font-size: 22px;
-  color: #6b7280;
-}
-
-/* Menú de tres puntitos */
-.grp-kebab { position: relative; }
-.grp-kebab-btn {
-  background: none;
-  border: none;
-  font-size: 1.4rem;
-  cursor: pointer;
-  color: #6b7280;
-}
-.grp-menu {
-  position: absolute;
-  right: 0; top: 24px;
-  background: #fff;
-  border: 1px solid #e6eaf1;
-  border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.08);
-  z-index: 10;
-  padding: 6px 0;
-}
-.grp-menu button {
-  display: block;
-  width: 100%;
-  padding: 8px 14px;
-  background: none;
-  border: none;
-  text-align: left;
-  font-size: 14px;
-  cursor: pointer;
-}
-.grp-menu button:hover {
-  background: #f9fafb;
-}
-
-/* Header del formulario de agregar */
-.add-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-/* ESTILOS ACTUALIZADOS PARA TODOS LOS BOTONES GROUP-NEW */
-.group-new {
-  display: grid;
-  place-items: center;
-  height: 78px;
-  background: var(--inactive);
-  border-radius: 10px;
-  cursor: pointer;
-  width: 100%;
-  transition: all 0.2s ease;
-  border: none;
-}
-
-.group-new:hover {
-  background-color: var(--color-azul-secundario);
-  filter: brightness(0.98);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.group-new .plus {
-  color: var(--inactive-contrast);
-  display: inline-grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  border: 1px solid var(--inactive-contrast);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1;
-  transition: all 0.2s ease;
-}
-
-.group-new:hover .plus {
-  border-color: white;
-  color: white;
-  transform: scale(1.2);
-  border: 1px solid white;
-}
-
-/* Botón cancelar con animación */
-.cancel-btn {
-  transition: all 0.2s ease;
-}
-
-.cancel-btn:hover {
-  background-color: #f8f9fa;
-  transform: translateY(-1px);
-}
-
- .form-group {
-          margin-bottom: 16px;
-        }
-        .form-group label {
-          display: block;
-          margin-bottom: 6px;
-          font-weight: 600;
-          color: #333;
-          font-size: 14px;
-        }
-        .time-range-selector {
-          display: flex;
-          gap: 12px;
-          align-items: end;
-        }
-        .time-select-group {
-          flex: 1;
-        }
-        .time-select-group label {
-          display: block;
-          margin-bottom: 4px;
-          font-size: 12px;
-          color: #666;
-          font-weight: normal;
-        }
-        .time-select {
-          width: 100%;
-          padding: 8px 12px;
-          border: 1px solid #ddd;
-          border-radius: 6px;
-          background: white;
-          font-size: 14px;
-        }
-        .prof-input {
-          width: 100%;
-          padding: 8px 12px;
-          border: 1px solid #ddd;
-          border-radius: 6px;
-          font-size: 14px;
-          margin-bottom: 0;
-        }
-        .prof-edit-form {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .result-item:hover {
-          background: #f8f9fa;
-        }
-        .recommend-panel {
-          animation: slideDown 0.2s ease-out;
-        }
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        @media (max-width: 899px) {
-          .jobs-grid { grid-template-columns: 1fr !important; }
-          .jobs-detail { display: none !important; }
-        }
-
-
-
-/* ------------------------------------------------- */
-/* ----------------- NUEVA VACANTE ----------------- */
-/* ------------------------------------------------- */
-
-.nueva-vacante-container {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-.nueva-vacante-header {
-  margin-bottom: 24px;
-}
-
-.nueva-vacante-back-btn {
-  background: none;
-  border: none;
-  color: var(--color-azul-secundario);
-  cursor: pointer;
-  padding: 8px 0;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.nueva-vacante-title {
-  margin: 0 0 8px 0;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-azul-oscuro);
-}
-
-.nueva-vacante-subtitle {
-  margin: 0;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.nueva-vacante-error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  font-size: 14px;
-}
-
-.nueva-vacante-card {
-  background: #fff;
-  border: 1px solid #e6eaf1;
-  border-radius: 12px;
-  padding: 20px;
-  margin-top: 20px;
-}
-
-.nueva-vacante-card-title {
-  margin: 0 0 16px 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-azul-oscuro);
-}
-
-.nueva-vacante-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.nueva-vacante-field {
-  display: grid;
-  gap: 6px;
-}
-
-.nueva-vacante-label {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 6px;
-}
-
-.nueva-vacante-input {
-  width: 100%;
-  background: #fff;
-  border: 1px solid #e6eaf1;
-  border-radius: 8px;
-  padding: 12px;
-  outline: none;
-  font-family: inherit;
-  font-size: 14px;
-  box-sizing: border-box;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.nueva-vacante-input:focus {
-  border-color: var(--color-azul-secundario);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.nueva-vacante-textarea {
-  width: 100%;
-  background: #fff;
-  border: 1px solid #e6eaf1;
-  border-radius: 8px;
-  padding: 12px;
-  outline: none;
-  font-family: inherit;
-  font-size: 14px;
-  box-sizing: border-box;
-  resize: vertical;
-  min-height: 120px;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.nueva-vacante-textarea:focus {
-  border-color: var(--color-azul-secundario);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.nueva-vacante-programs-list {
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.nueva-vacante-program-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  cursor: pointer;
-}
-
-.nueva-vacante-program-label {
-  font-size: 14px;
-  color: #374151;
-}
-
-.nueva-vacante-program-label strong {
-  color: var(--color-azul-oscuro);
-}
-
-.nueva-vacante-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.nueva-vacante-cancel-btn {
-  padding: 12px 24px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #fff;
-  color: #374151;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.nueva-vacante-cancel-btn:hover {
-  background: #f9fafb;
-  transform: translateY(-1px);
-}
-
-.nueva-vacante-cancel-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.nueva-vacante-save-btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
-  background: var(--color-azul-secundario);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.nueva-vacante-save-btn:hover:not(:disabled) {
-  background: var(--color-principal);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
-}
-
-.nueva-vacante-save-btn:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-.nueva-vacante-loading {
-  padding: 40px;
-  text-align: center;
-  color: #6b7280;
-}
-
-/* Checkbox personalizado */
-.nueva-vacante-program-item input[type="checkbox"] {
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
-  border: 2px solid #d1d5db;
-  border-radius: 4px;
-  appearance: none;
-  background: #fff;
-  position: relative;
-  transition: all 0.2s;
-}
-
-.nueva-vacante-program-item input[type="checkbox"]:checked {
-  background: var(--color-azul-secundario);
-  border-color: var(--color-azul-secundario);
-}
-
-.nueva-vacante-program-item input[type="checkbox"]:checked::after {
-  content: "✓";
-  position: absolute;
-  color: white;
-  font-size: 12px;
-  font-weight: bold;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-/* Placeholders */
-.nueva-vacante-input::placeholder,
-.nueva-vacante-textarea::placeholder {
-  color: #9ca3af;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .nueva-vacante-container {
-    padding: 16px;
-  }
-  
-  .nueva-vacante-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .nueva-vacante-actions {
-    flex-direction: column;
-  }
-  
-  .nueva-vacante-cancel-btn,
-  .nueva-vacante-save-btn {
+  .cards-section.empresas {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
     width: 100%;
-    text-align: center;
+    padding: 1rem 0;
+  }
+  .logo-card {
+    max-width: 225px;
+    max-height: 180px;
   }
 }
-
-@media (max-width: 480px) {
-  .nueva-vacante-title {
-    font-size: 20px;
-  }
-  
-  .nueva-vacante-card {
-    padding: 16px;
-  }
-  
-  .nueva-vacante-card-title {
-    font-size: 16px;
-  }
-}
-
-
-/* ------------------------------------------------- */
-/* ------------ PÁGINA DETALLE VACANTE ------------- */
-/* ------------------------------------------------- */
-
-.empresa-vacante-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-/* Header con botón volver */
-.empresa-vacante-header {
-  margin-bottom: 24px;
-}
-
-.empresa-vacante-back-btn {
-  background: none;
-  border: none;
-  color: var(--color-azul-secundario);
-  cursor: pointer;
-  padding: 8px 0;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  transition: color 0.2s ease;
-}
-
-.empresa-vacante-back-btn:hover {
-  color: var(--color-principal);
-}
-
-.empresa-vacante-title-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.empresa-vacante-title {
-  margin: 0;
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--color-azul-oscuro);
-  line-height: 1.2;
-}
-
-.empresa-vacante-status {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-.status-indicator {
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.status-indicator.activa {
-  background: #dcfce7;
-  color: #166534;
-  border: 1px solid #bbf7d0;
-}
-
-.status-indicator.inactiva {
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fde68a;
-}
-
-.empresa-vacante-cupo {
-  font-size: 14px;
-  color: #6b7280;
-}
-
-/* Tabs de navegación */
-.empresa-vacante-tabs {
-  display: flex;
-  border-bottom: 1px solid #e6eaf1;
-  margin-bottom: 24px;
-}
-
-.empresa-tab {
-  background: none;
-  border: none;
-  padding: 12px 20px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #6b7280;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s ease;
-}
-
-.empresa-tab:hover {
-  color: var(--color-principal);
-}
-
-.empresa-tab.active {
-  color: var(--color-azul-secundario);
-  border-bottom-color: var(--color-azul-secundario);
-}
-
-/* Contenido principal */
-.empresa-vacante-content {
-  background: #fff;
-  border: 1px solid #e6eaf1;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,.05);
-}
-
-/* Sección de detalles */
-.empresa-vacante-details {
-  padding: 24px;
-}
-
-.empresa-vacante-info {
-  margin-bottom: 24px;
-}
-
-.empresa-vacante-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.empresa-chip {
-  background: #f8fafc;
-  border: 1px solid #e6eaf1;
-  color: #475569;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.empresa-vacante-location {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #374151;
-  margin-bottom: 20px;
-  font-size: 14px;
-}
-
-.empresa-vacante-section {
-  margin-bottom: 20px;
-}
-
-.empresa-vacante-section h3 {
-  margin: 0 0 12px 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-azul-oscuro);
-}
-
-.empresa-list {
-  margin: 0;
-  padding-left: 18px;
-  color: #374151;
-  line-height: 1.5;
-}
-
-.empresa-list li {
-  margin-bottom: 6px;
-}
-
-/* Acciones de la vacante */
-.empresa-vacante-actions {
-  display: flex;
-  gap: 12px;
-  padding-top: 20px;
-  border-top: 1px solid #eef1f6;
-}
-
-/* Formulario de edición */
-.empresa-edit-form {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.empresa-edit-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.empresa-edit-section h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-azul-oscuro);
-  padding-bottom: 8px;
-  border-bottom: 1px solid #eef1f6;
-}
-
-.empresa-edit-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 16px;
-}
-
-.empresa-edit-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.empresa-edit-field label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-}
-
-.empresa-edit-field input,
-.empresa-edit-field select,
-.empresa-edit-field textarea {
-  padding: 10px 12px;
-  border: 1px solid #e6eaf1;
-  border-radius: 8px;
-  background: #fff;
-  font-size: 14px;
-  font-family: inherit;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.empresa-edit-field input:focus,
-.empresa-edit-field select:focus,
-.empresa-edit-field textarea:focus {
-  outline: none;
-  border-color: var(--color-azul-secundario);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.empresa-programs-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 12px;
-  border: 1px solid #e6eaf1;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.empresa-program-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 6px;
-  transition: background-color 0.2s;
-}
-
-.empresa-program-checkbox:hover {
-  background: #f1f5f9;
-}
-
-.empresa-program-checkbox input[type="checkbox"] {
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
-  border: 2px solid #d1d5db;
-  border-radius: 4px;
-  appearance: none;
-  background: #fff;
-  position: relative;
-  transition: all 0.2s;
-}
-
-.empresa-program-checkbox input[type="checkbox"]:checked {
-  background: var(--color-azul-secundario);
-  border-color: var(--color-azul-secundario);
-}
-
-.empresa-program-checkbox input[type="checkbox"]:checked::after {
-  content: "✓";
-  position: absolute;
-  color: white;
-  font-size: 12px;
-  font-weight: bold;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.empresa-edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-top: 20px;
-  border-top: 1px solid #eef1f6;
-}
-
-/* Sección de postulaciones */
-.empresa-vacante-applications {
-  padding: 24px;
-}
-
-.empresa-no-applications {
-  text-align: center;
-  padding: 40px 20px;
-  color: #6b7280;
-}
-
-.empresa-applications-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* Tarjeta de estudiante */
-.empresa-student-card {
-  background: #fff;
-  border: 1px solid #e6eaf1;
-  border-radius: 12px;
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-
-.empresa-student-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,.08);
-}
-
-.empresa-student-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.empresa-student-header:hover {
-  background: #f8fafc;
-}
-
-.empresa-student-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.empresa-student-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.empresa-student-avatar-fallback {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: var(--color-principal);
-  color: white;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 18px;
-}
-
-.empresa-student-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.empresa-student-name {
-  font-weight: 600;
-  color: var(--color-azul-oscuro);
-  margin-bottom: 4px;
-  font-size: 16px;
-}
-
-.empresa-student-subtitle {
-  color: #6b7280;
-  font-size: 14px;
-  margin-bottom: 4px;
-}
-
-.empresa-student-meta {
-  font-size: 12px;
-  color: #9ca3af;
-}
-
-.empresa-student-status {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.status-badge {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.empresa-student-details {
-  padding: 0 16px 16px 72px;
-  border-top: 1px solid #eef1f6;
-  margin-top: 8px;
-  padding-top: 16px;
-}
-
-.empresa-student-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* Estados de carga y error */
-.empresa-vacante-loading {
-  padding: 40px;
-  text-align: center;
-  color: #6b7280;
-}
-
-.empresa-vacante-error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  font-size: 14px;
-}
-
-/* Responsive */
 @media (max-width: 768px) {
-  .empresa-vacante-container {
-    padding: 16px;
+  .section-container-fondo-imagen {
+    min-height: 250px;
   }
-  
-  .empresa-vacante-title-section {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+
+  .section-container-fondo-imagen h2 {
+    font-size: 1.5rem;
   }
-  
-  .empresa-vacante-status {
-    align-items: flex-start;
+
+  .section-container-fondo-imagen p {
+    font-size: 0.9rem;
   }
-  
-  .empresa-vacante-tabs {
-    overflow-x: auto;
+
+  .cards-section.empresas {
+    grid-template-columns: repeat(2, 1fr);
   }
-  
-  .empresa-edit-grid {
+
+  .card { height: 250px; }
+  .card-overlay h3 { font-size: 1rem; }
+  .card-overlay p { font-size: 0.8rem; }
+
+
+.contenedorBanner {
+  max-height: 600px;
+}
+  .texto-banner {
+      padding: 0rem 5rem 10rem 4rem;
+  }
+
+  .texto-info h2 {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+  }
+  .info-card-one {
     grid-template-columns: 1fr;
   }
-  
-  .empresa-vacante-actions {
-    flex-direction: column;
+  .info-img {
+    height: 400px;
   }
-  
-  .empresa-student-header {
-    padding: 12px;
+
+  .info-card-two {
+    grid-template-columns: 1fr;
   }
-  
-  .empresa-student-details {
-    padding-left: 16px;
-    padding-right: 16px;
+  .cards-practicas {
+    grid-template-columns: 1fr;
   }
-  
-  .empresa-student-status {
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 8px;
+
+  .card-info {
+    height: auto;
+    padding-bottom: 1.5rem;
+  }
+  .llamado {
+    padding: 2rem;
   }
 }
 
-@media (max-width: 480px) {
-  .empresa-vacante-title {
-    font-size: 24px;
+
+@media (max-width: 600px) {
+  .Contenedor{
+    width: 80%;
   }
-  
-  .empresa-vacante-details {
-    padding: 16px;
+
+  .root{
+    --alto-navbar:40px;
   }
-  
-  .empresa-vacante-applications {
-    padding: 16px;
+
+  .card { height: 200px; }
+  .card-overlay h3 { font-size: 0.9rem; }
+  .card-overlay p { font-size: 0.7rem; }
+  .cards-section {
+    grid-template-columns: 1fr; /* todas en columna */
+    gap: 1rem;
   }
-  
-  .empresa-student-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+
+  .cards-section.empresas {
+    grid-template-columns: 1fr;
+    gap: 1rem;
   }
-  
-  .empresa-student-status {
-    align-self: stretch;
-    flex-direction: row;
-    justify-content: space-between;
+
+  .logo-card {
+    max-width: 480px;
+    max-height: 384px;
+  }
+
+  .card-title {
+    font-size: 1.1rem;
+  }
+  .info-panel.open {
+    max-height: 300px; /* más espacio en móviles */
+  }
+
+  .logo-vinculacion {
+    margin: auto;
+    margin-bottom: 1rem;
+  }
+}
+
+
+@media (max-width: 500px) {
+  .section-container-fondo-imagen {
+    min-height: 200px;
+  }
+
+  .section-container-fondo-imagen .overlay {
+    padding: 1rem;
+  }
+
+  .btn-leer-mas {
+    font-size: 0.9rem;
+    padding: 0.6rem 1.2rem;
   }
 }

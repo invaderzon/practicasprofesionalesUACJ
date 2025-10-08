@@ -154,7 +154,7 @@ export default function Navbar() {
           <span></span><span></span><span></span>
         </div>
         <div className={`nav-links ${menuActive ? "active" : ""}`}>
-          <Link className="nav-text" href="/login">INICIAR SESIÓN</Link>
+          <Link className="nav-text" href="/login">Iniciar sesión</Link>
         </div>
       </nav>
     );
@@ -204,12 +204,7 @@ export default function Navbar() {
             </nav>
           </div>
           <div className="derecha">
-            <div
-              className={`menu-toggle portal ${portalMenuOpen ? "active" : ""}`}
-              onClick={togglePortalMenu}
-            >
-              <span></span><span></span><span></span>
-            </div>
+            
             <NotificationsBell />
             <button className="btn-usuario" onClick={toggleUser}>
               <span className="usuario-nombre">{userName}</span>
@@ -231,6 +226,12 @@ export default function Navbar() {
                 <button className="menu-item" onClick={logout}>Cerrar sesión</button>
               </div>
             )}
+            <div
+              className={`menu-toggle portal ${portalMenuOpen ? "active" : ""}`}
+              onClick={togglePortalMenu}
+            >
+              <span></span><span></span><span></span>
+            </div>
           </div>
         </div>
       </header>

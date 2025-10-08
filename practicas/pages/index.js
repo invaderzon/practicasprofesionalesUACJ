@@ -142,16 +142,16 @@ export default function Home() {
         <div className="contenedor-cards-empresas">
           <h2 className="section-title-fondo">Empresas con vinculación a la UACJ</h2>
           <section className="cards-section empresas">
-            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo1.png')" }}></div>
-            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo2.png')" }}></div>
-            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo3.png')" }}></div>
-            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo4.png')" }}></div>
-            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo5.png')" }}></div>
-            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo1.png')" }}></div>
-            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo2.png')" }}></div>
-            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo3.png')" }}></div>
-            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo4.png')" }}></div>
-            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo5.png')" }}></div>
+            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo-arteenelparque.png')" }}></div>
+            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo-comex.png')" }}></div>
+            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo-conagua.png')" }}></div>
+            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo-hivision.png')" }}></div>
+            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo-kia.png')" }}></div>
+            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo-semarnat.png')" }}></div>
+            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo-tecma.png')" }}></div>
+            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo-totalgas.png')" }}></div>
+            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo-wistron.png')" }}></div>
+            <div className="card logo-card" style={{ backgroundImage: "url('/img/logo-rodadora.png')" }}></div>
           </section>
         </div>
 
