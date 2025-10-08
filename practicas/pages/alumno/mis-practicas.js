@@ -129,209 +129,208 @@ export default function MisPracticasPage() {
   const bump = () => (refreshKey.current += 1);
 
   useEffect(() => {
-  const load = async () => {
-    setLoading(true);
-    setErr("");
+    const load = async () => {
+      setLoading(true);
+      setErr("");
 
-    // 1) Usuario
-    const { data: { user: u }, error: uErr } = await supabase.auth.getUser();
-    if (uErr || !u) {
-      setErr(uErr?.message || "No se pudo obtener el usuario.");
-      setLoading(false);
-      return;
-    }
-    setUser(u);
+      // 1) Usuario
+      const { data: { user: u }, error: uErr } = await supabase.auth.getUser();
+      if (uErr || !u) {
+        setErr(uErr?.message || "No se pudo obtener el usuario.");
+        setLoading(false);
+        return;
+      }
+      setUser(u);
 
-    // 2) Perfil + programa
-    const { data: prof, error: pErr } = await supabase
-      .from("profiles")
-      .select(`
-        id,
-        full_name,
-        program_id,
-        avatar_url,
-        cv_url,
-        program:programs (
-          id, key, name, faculty
-        )
-      `)
-      .eq("id", u.id)
-      .single();
-
-    if (pErr) {
-      setErr(pErr.message);
-      setLoading(false);
-      return;
-    }
-
-    // 3) Cargar información del grupo y profesor
-    const { data: groupMembers, error: gmErr } = await supabase
-      .from("group_members")
-      .select(`
-        group:groups (
-          id,
-          name,
-          color,
-          professor_id
-        )
-      `)
-      .eq("student_id", u.id)
-      .maybeSingle();
-
-    let groupInfo = null;
-    let professorInfo = null;
-
-    if (groupMembers?.group) {
-      groupInfo = groupMembers.group;
-      
-      const { data: profData } = await supabase
+      // 2) Perfil + programa
+      const { data: prof, error: pErr } = await supabase
         .from("profiles")
-        .select("id, full_name, email")
-        .eq("id", groupInfo.professor_id)
-        .single();
-      
-      professorInfo = profData;
-    }
-
-    setProfile({
-      id: prof.id,
-      full_name: prof.full_name || "(Sin nombre)",
-      email: u.email || "",
-      avatar_url: cacheBust(prof.avatar_url || ""),
-      cv_url: prof.cv_url || "",
-      program: prof.program || null,
-      group: groupInfo,
-      professor: professorInfo
-    });
-
-    // 4) Verificar si tiene práctica activa - sincronizado con el hook
-    if (hasActivePractice) {
-      const { data: activePractice, error: practiceErr } = await supabase
-        .from("practices")
         .select(`
-          student_id,
+          id,
+          full_name,
+          program_id,
+          avatar_url,
+          cv_url,
+          program:programs (
+            id, key, name, faculty
+          )
+        `)
+        .eq("id", u.id)
+        .single();
+
+      if (pErr) {
+        setErr(pErr.message);
+        setLoading(false);
+        return;
+      }
+
+      // 3) Cargar información del grupo y profesor
+      const { data: groupMembers, error: gmErr } = await supabase
+        .from("group_members")
+        .select(`
+          group:groups (
+            id,
+            name,
+            color,
+            professor_id
+          )
+        `)
+        .eq("student_id", u.id)
+        .maybeSingle();
+
+      let groupInfo = null;
+      let professorInfo = null;
+
+      if (groupMembers?.group) {
+        groupInfo = groupMembers.group;
+        
+        const { data: profData } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .eq("id", groupInfo.professor_id)
+          .single();
+        
+        professorInfo = profData;
+      }
+
+      setProfile({
+        id: prof.id,
+        full_name: prof.full_name || "(Sin nombre)",
+        email: u.email || "",
+        avatar_url: cacheBust(prof.avatar_url || ""),
+        cv_url: prof.cv_url || "",
+        program: prof.program || null,
+        group: groupInfo,
+        professor: professorInfo
+      });
+
+      // 4) Verificar si tiene práctica activa - sincronizado con el hook
+      if (hasActivePractice) {
+        const { data: activePractice, error: practiceErr } = await supabase
+          .from("practices")
+          .select(`
+            student_id,
+            vacancy:vacancies (
+              id, title, modality, compensation, language,
+              location_text, rating_avg, rating_count, created_at,
+              company:companies ( id, name, logo_url )
+            ),
+            application:applications (
+              id, applied_at, status, decision_at
+            )
+          `)
+          .eq("student_id", u.id)
+          .eq("status", 'active')
+          .single();
+
+        if (practiceErr && practiceErr.code !== 'PGRST116') {
+          console.error("Error loading practice:", practiceErr);
+        }
+
+        if (activePractice?.vacancy) {
+          setActivePractice(activePractice);
+        } else {
+          setActivePractice(null);
+        }
+      } else {
+        setActivePractice(null);
+      }
+
+      // 5) Favoritos
+      const { data: favs, error: fErr } = await supabase
+        .from("vacancy_favorites")
+        .select(`
+          id,
+          vacancy_id,
+          created_at,
           vacancy:vacancies (
             id, title, modality, compensation, language,
             location_text, rating_avg, rating_count, created_at,
             company:companies ( id, name, logo_url )
-          ),
-          application:applications (
-            id, applied_at, status, decision_at
           )
         `)
         .eq("student_id", u.id)
-        .eq("status", 'active')
-        .single();
+        .order("created_at", { ascending: false });
 
-      if (practiceErr && practiceErr.code !== 'PGRST116') {
-        console.error("Error loading practice:", practiceErr);
+      if (fErr) {
+        setErr(fErr.message);
+        setLoading(false);
+        return;
+      }
+      const favVacancies = (favs || [])
+        .map((r) => ({ favRowId: r.id, ...r.vacancy }))
+        .filter((v) => !!v?.id);
+      setFavorites(favVacancies);
+
+      // 6) TODAS las aplicaciones del alumno
+      const { data: apps, error: aErr } = await supabase
+        .from("applications")
+        .select(`
+          id, status, applied_at,
+          vacancy:vacancies (
+            id, title, modality, compensation, language,
+            location_text, rating_avg, rating_count, created_at,
+            company:companies ( id, name, logo_url )
+          )
+        `)
+        .eq("student_id", u.id)
+        .order("applied_at", { ascending: false });
+
+      if (aErr) {
+        setErr(aErr.message);
+        setLoading(false);
+        return;
       }
 
-      if (activePractice?.vacancy) {
-        setActivePractice(activePractice);
-      } else {
-        setActivePractice(null);
+      const appsClean = (apps || []).filter((r) => r?.vacancy?.id);
+      
+      const appliedList = appsClean
+        .filter((r) => {
+          const status = String(r.status || "").toLowerCase();
+          return !COMPLETED_STATES.includes(status) && status !== "rechazada";
+        })
+        .map((r) => ({ ...r.vacancy, _app_status: r.status, _applied_at: r.applied_at }));
+
+      const completedList = appsClean
+        .filter((r) => COMPLETED_STATES.includes(String(r.status || "").toLowerCase()))
+        .map((r) => ({ ...r.vacancy, _app_status: r.status, _applied_at: r.applied_at }));
+
+      setCompleted(completedList);
+      setApplied(appliedList);
+
+      // 7) Vacantes silenciadas
+      const { data: hidd, error: hErr } = await supabase
+        .from("vacancy_hidden")
+        .select(`
+          id,
+          vacancy_id, created_at,
+          vacancy:vacancies (
+            id, title, modality, compensation, language,
+            location_text, rating_avg, rating_count, created_at,
+            company:companies ( id, name, logo_url )
+          )
+        `)
+        .eq("student_id", u.id)
+        .order("created_at", { ascending: false });
+
+      if (hErr) {
+        setErr(hErr.message);
+        setLoading(false);
+        return;
       }
-    } else {
-      setActivePractice(null);
-    }
+      const hiddenVacancies = (hidd || [])
+        .map((r) => ({ hiddenRowId: r.id, ...r.vacancy }))
+        .filter((v) => !!v?.id);
+      setHidden(hiddenVacancies);
 
-    // 5) Favoritos
-    const { data: favs, error: fErr } = await supabase
-      .from("vacancy_favorites")
-      .select(`
-        id,
-        vacancy_id,
-        created_at,
-        vacancy:vacancies (
-          id, title, modality, compensation, language,
-          location_text, rating_avg, rating_count, created_at,
-          company:companies ( id, name, logo_url )
-        )
-      `)
-      .eq("student_id", u.id)
-      .order("created_at", { ascending: false });
-
-    if (fErr) {
-      setErr(fErr.message);
       setLoading(false);
-      return;
+    };
+
+    // Solo cargar datos cuando el hook haya terminado de verificar
+    if (!practiceLoading) {
+      load();
     }
-    const favVacancies = (favs || [])
-      .map((r) => ({ favRowId: r.id, ...r.vacancy }))
-      .filter((v) => !!v?.id);
-    setFavorites(favVacancies);
-
-    // 6) TODAS las aplicaciones del alumno
-    const { data: apps, error: aErr } = await supabase
-      .from("applications")
-      .select(`
-        id, status, applied_at,
-        vacancy:vacancies (
-          id, title, modality, compensation, language,
-          location_text, rating_avg, rating_count, created_at,
-          company:companies ( id, name, logo_url )
-        )
-      `)
-      .eq("student_id", u.id)
-      .order("applied_at", { ascending: false });
-
-    if (aErr) {
-      setErr(aErr.message);
-      setLoading(false);
-      return;
-    }
-
-    const appsClean = (apps || []).filter((r) => r?.vacancy?.id);
-    
-    // CORRECCIÓN: Siempre mostrar postulaciones activas, independientemente de si hay práctica activa
-    const appliedList = appsClean
-      .filter((r) => {
-        const status = String(r.status || "").toLowerCase();
-        return !COMPLETED_STATES.includes(status) && status !== "rechazada";
-      })
-      .map((r) => ({ ...r.vacancy, _app_status: r.status, _applied_at: r.applied_at }));
-
-    const completedList = appsClean
-      .filter((r) => COMPLETED_STATES.includes(String(r.status || "").toLowerCase()))
-      .map((r) => ({ ...r.vacancy, _app_status: r.status, _applied_at: r.applied_at }));
-
-    setCompleted(completedList);
-    setApplied(appliedList);
-
-    // 7) Vacantes silenciadas
-    const { data: hidd, error: hErr } = await supabase
-      .from("vacancy_hidden")
-      .select(`
-        id,
-        vacancy_id, created_at,
-        vacancy:vacancies (
-          id, title, modality, compensation, language,
-          location_text, rating_avg, rating_count, created_at,
-          company:companies ( id, name, logo_url )
-        )
-      `)
-      .eq("student_id", u.id)
-      .order("created_at", { ascending: false });
-
-    if (hErr) {
-      setErr(hErr.message);
-      setLoading(false);
-      return;
-    }
-    const hiddenVacancies = (hidd || [])
-      .map((r) => ({ hiddenRowId: r.id, ...r.vacancy }))
-      .filter((v) => !!v?.id);
-    setHidden(hiddenVacancies);
-
-    setLoading(false);
-  };
-
-  // Solo cargar datos cuando el hook haya terminado de verificar
-  if (!practiceLoading) {
-    load();
-  }
-}, [refreshKey.current, hasActivePractice, practiceLoading]);
+  }, [refreshKey.current, hasActivePractice, practiceLoading]);
 
   // Función para finalizar práctica con calificación
   const handleCompletePractice = async () => {
@@ -715,8 +714,8 @@ export default function MisPracticasPage() {
 
   const statusTone = (s) => {
     const k = String(s || "").toLowerCase();
-    if (k === "aceptada" || k === "oferta") return "success";
-    if (k === "en revisión" || k === "postulada") return "default";
+    if (k === "aceptada") return "success";
+    if (k === "oferta") return "warn";
     if (k === "rechazada" || k === "retirada") return "danger";
     return "default";
   };
@@ -937,29 +936,6 @@ export default function MisPracticasPage() {
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Postulaciones Activas */}
-            {!loading && applied.length > 0 && (
-              <>
-                <h2 style={{ textAlign: "center" }}>Mis Postulaciones</h2>
-                {applied.map((v) => (
-                  <Card
-                    key={v.id}
-                    v={v}
-                    subtitle={`Postulada el ${fmtDate(v._applied_at)}`}
-                    actions={chip(`Estado: ${v._app_status || "-"}`, statusTone(v._app_status))}
-                  />
-                ))}
-              </>
-            )}
-
-            {/* Mensaje cuando no hay postulaciones activas */}
-            {!loading && applied.length === 0 && !hasActivePractice && (
-              <div style={{ textAlign: "center", marginTop: 20 }}>
-                <h2 style={{ textAlign: "center" }}>Mis Postulaciones</h2>
-                <div className="jobs-empty small">No tienes postulaciones activas.</div>
               </div>
             )}
 
