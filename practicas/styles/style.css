@@ -542,6 +542,9 @@ body {
 /* Panel izquierdo (azul con patrón opcional) */
 .login-left{
   background: var(--color-principal);
+  background-image: url('/img/sign-in-vector.png');
+  background-size: cover;
+  background-position: center;
   position: relative;
   /*display: grid;
   place-items: center;*/
@@ -550,8 +553,8 @@ body {
 
 /* Si quieres una imagen en el panel izquierdo, colócala dentro de .login-left */
 .login-left img{
-  max-width: 100%;
-  height: auto;
+  width: 100%;
+  height: 100%;
   display: block;
   filter: drop-shadow(0 2px 8px rgba(0,0,0,.2));
 }
@@ -650,7 +653,7 @@ body {
 /* Responsive */
 @media (max-width: 900px){
   .login-card{ grid-template-columns: 1fr; }
-  .login-left{ min-height: 160px; }
+  .login-left{ min-height: 260px; }
 }
 
 @media (max-width: 600px) {

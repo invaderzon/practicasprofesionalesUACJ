@@ -154,7 +154,7 @@ export default function Navbar() {
           <span></span><span></span><span></span>
         </div>
         <div className={`nav-links ${menuActive ? "active" : ""}`}>
-          <Link className="nav-text" href="/login">INICIAR SESIÓN</Link>
+          <Link className="nav-text" href="/login">Iniciar sesión</Link>
         </div>
       </nav>
     );

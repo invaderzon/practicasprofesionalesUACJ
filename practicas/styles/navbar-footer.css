@@ -308,7 +308,6 @@
   height: 40px;
   flex: 0 0 40px;          /* no se encoje */
   border-radius: 50%;
-  
   background: linear-gradient(145deg,#7ea0c8,#3d5a86);
   border: 1px solid #dbe1ea;
 }
@@ -645,12 +644,6 @@
   background: #e0ecff;
   border-color: #c7ddff;
 }
-
-
-
-
-
-
 
 
 /* =============== FOOTER =================== */
