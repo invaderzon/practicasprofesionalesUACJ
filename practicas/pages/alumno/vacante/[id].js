@@ -113,74 +113,82 @@ export default function VacanteDetallePage() {
   const [isParticipatingInThisVacancy, setIsParticipatingInThisVacancy] = useState(false);
   const [activePracticeData, setActivePracticeData] = useState(null);
   const [hasCompletedPracticeForThisVacancy, setHasCompletedPracticeForThisVacancy] = useState(false);
+  const [applicationStatus, setApplicationStatus] = useState(null);
 
-  // Obtener usuario y aplicaciones
+  // Obtener usuario y aplicaciones - COMPLETAMENTE CORREGIDO
   useEffect(() => {
     const boot = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
 
-        // Cargar aplicaciones normales (EXCLUYENDO las completadas para la lógica de "ya postulado")
+        console.log("🔍 Iniciando carga de estados para usuario:", user.id, "vacante:", id);
+
+        // 1. Primero verificar si está participando en ESTA vacante específica
+        const { data: activePractice } = await supabase
+          .from("practices")
+          .select("vacancy_id")
+          .eq("student_id", user.id)
+          .eq("status", "active")
+          .single();
+
+        console.log("🏆 Práctica activa encontrada:", activePractice);
+
+        if (activePractice) {
+          setActivePracticeData(activePractice);
+          const participatingInThis = activePractice.vacancy_id === id;
+          setIsParticipatingInThisVacancy(participatingInThis);
+          console.log("🎯 Participando en ESTA vacante:", participatingInThis);
+        } else {
+          setActivePracticeData(null);
+          setIsParticipatingInThisVacancy(false);
+        }
+
+        // 2. Cargar TODAS las aplicaciones del usuario para esta vacante
         const { data: appsData } = await supabase
           .from("applications")
           .select("id, vacancy_id, status")
           .eq("student_id", user.id)
-          .not("status", "in", "('completada','terminada','finalizada','completed','finished','done')")
-          .limit(1000);
-        
-        if (appsData) {
-          setAppliedVacancyIds(appsData.map(a => a.vacancy_id));
+          .eq("vacancy_id", id);
+
+        console.log("📋 TODAS las aplicaciones para esta vacante:", appsData);
+
+        if (appsData && appsData.length > 0) {
+          // Actualizar appliedVacancyIds
+          const allAppliedIds = [...new Set(appsData.map(a => a.vacancy_id))];
+          setAppliedVacancyIds(allAppliedIds);
+
+          // 3. Buscar oferta específica para esta vacante
+          const offerForThis = appsData.find(app => app.status === 'oferta');
+          console.log("🎉 Oferta encontrada para esta vacante:", !!offerForThis, offerForThis);
+          setHasOfferForThisVacancy(!!offerForThis);
+
+          // 4. Buscar prácticas completadas para esta vacante
+          const completedPractice = appsData.find(app => 
+            app.status === 'completada' || app.status === 'finalizada'
+          );
+          console.log("🔄 Práctica completada encontrada:", !!completedPractice);
+          setHasCompletedPracticeForThisVacancy(!!completedPractice);
+
+          // 5. Guardar el estado actual de la aplicación
+          const currentApp = appsData.find(app => 
+            ['postulada', 'en_proceso', 'oferta'].includes(app.status)
+          );
+          setApplicationStatus(currentApp?.status || null);
           
-          // Verificar si tiene oferta para esta vacante específica
-          if (id) {
-            const offerForThis = appsData.find(app => 
-              app.vacancy_id === id && app.status === 'oferta'
-            );
-            if (offerForThis) {
-              setHasOfferForThisVacancy(true);
-            }
-
-            // Verificar si tiene una práctica COMPLETADA para esta vacante
-            const { data: completedApps } = await supabase
-              .from("applications")
-              .select("id, status")
-              .eq("student_id", user.id)
-              .eq("vacancy_id", id)
-              .in("status", ["completada", "terminada", "finalizada", "completed", "finished", "done"])
-              .single();
-
-            if (completedApps) {
-              setHasCompletedPracticeForThisVacancy(true);
-            }
-          }
-        }
-
-        // Cargar datos de la práctica activa si existe
-        if (hasActivePractice) {
-          const { data: practiceData } = await supabase
-            .from("practices")
-            .select("vacancy_id")
-            .eq("student_id", user.id)
-            .eq("status", "active")
-            .single();
-          
-          if (practiceData) {
-            setActivePracticeData(practiceData);
-            
-            // Verificar si está participando en ESTA vacante específica
-            if (id && practiceData.vacancy_id === id) {
-              setIsParticipatingInThisVacancy(true);
-              console.log("Está participando en esta vacante específica");
-            }
-          }
+        } else {
+          console.log("📭 No hay aplicaciones para esta vacante");
+          setHasOfferForThisVacancy(false);
+          setHasCompletedPracticeForThisVacancy(false);
+          setApplicationStatus(null);
         }
       }
     };
+    
     if (id && !practiceLoading) {
       boot();
     }
-  }, [id, hasActivePractice, practiceLoading]);
+  }, [id, practiceLoading]);
 
   // Carga de la vacante
   useEffect(() => {
@@ -255,14 +263,14 @@ export default function VacanteDetallePage() {
       if (!userId) { router.push("/login"); return; }
       if (!vacancy?.id) return;
       
-      // USAR EL VALOR DEL HOOK
-      if (hasActivePractice) {
+      // VERIFICACIÓN CORREGIDA: Solo bloquear si tiene práctica activa PERO NO en esta vacante
+      if (hasActivePractice && !isParticipatingInThisVacancy) {
         alert("Ya tienes un proyecto activo. No puedes postularte a otras vacantes.");
         return;
       }
 
       // Verificar si ya tiene una aplicación ACTIVA (no completada) para esta vacante
-      if (appliedVacancyIds.includes(vacancy.id)) {
+      if (appliedVacancyIds.includes(vacancy.id) && !hasCompletedPracticeForThisVacancy) {
         alert("Ya te has postulado a esta vacante.");
         return;
       }
@@ -276,11 +284,22 @@ export default function VacanteDetallePage() {
       setApplyLoading(true);
 
       // Llama a la función SQL: public.apply_and_notify(uuid)
-      const { error } = await supabase.rpc("apply_and_notify", {
+      console.log("🔄 Llamando a apply_and_notify_v2 para vacante:", vacancy.id);
+
+      const { data, error } = await supabase.rpc("apply_and_notify_v2", {
         p_vacancy_id: vacancy.id,
       });
 
+      console.log("📋 Respuesta del RPC:", { data, error });
+
       if (error) {
+        console.error("❌ Error COMPLETO del RPC:", {
+          message: error.message,
+          details: error.details, 
+          hint: error.hint,
+          code: error.code
+        });
+        
         // Duplicado (ya postuló antes)
         if ((error.code === "23505") || /duplicate key|already exists/i.test(error.message || "")) {
           alert("Ya te habías postulado a esta vacante.");
@@ -292,8 +311,11 @@ export default function VacanteDetallePage() {
 
       // Éxito: marca como postulada en UI
       setAppliedVacancyIds((prev) => [...prev, vacancy.id]);
-      setHasCompletedPracticeForThisVacancy(false); // Resetear el estado de práctica completada
+      setHasCompletedPracticeForThisVacancy(false);
+      setHasOfferForThisVacancy(false);
+      setApplicationStatus('postulada');
       alert("¡Listo! Tu postulación fue enviada.");
+      
     } catch (e) {
       console.error(e);
       alert(e.message || "No se pudo completar la postulación.");
@@ -327,37 +349,100 @@ export default function VacanteDetallePage() {
     );
   }
 
-  // DEBUG: Mostrar estados actuales
-  console.log("Estados actuales:", {
-    vacancyId: id,
-    isParticipatingInThisVacancy,
-    hasOfferForThisVacancy,
-    hasActivePractice, // USANDO EL HOOK
-    appliedVacancyIds,
-    hasCompletedPracticeForThisVacancy,
-    userId
-  });
-
-  // Determinar el texto del botón y si está deshabilitado
+  // Determinar el texto del botón - COMPLETAMENTE REESCRITO
   const getApplyButtonState = () => {
+    console.log("🎯 Calculando estado del botón:", {
+      isParticipatingInThisVacancy,
+      hasOfferForThisVacancy,
+      hasActivePractice,
+      appliedVacancyIds: appliedVacancyIds.includes(vacancy?.id),
+      hasCompletedPracticeForThisVacancy,
+      applicationStatus
+    });
+
+    // 1. PRIORIDAD MÁXIMA: Ya está participando en ESTA vacante
     if (isParticipatingInThisVacancy) {
-      return { text: "✅ Ya estás participando en este proyecto", disabled: false, action: goToMyPractices };
-    } else if (hasActivePractice) {
-      return { text: "⏸️ Ya estás participando en otro proyecto", disabled: true, action: null };
-    } else if (hasOfferForThisVacancy) {
-      return { text: "🎉 ¡Tienes una oferta! Revisar oferta", disabled: false, action: goToOffers };
-    } else if (appliedVacancyIds.includes(vacancy?.id)) {
-      return { text: "Ya postulada", disabled: true, action: null };
-    } else if (vacancy?.spots_left <= 0) {
-      return { text: "Cupos agotados", disabled: true, action: null };
-    } else if (hasCompletedPracticeForThisVacancy) {
-      return { text: "Postularse nuevamente", disabled: false, action: onApply };
-    } else {
-      return { text: applyLoading ? "Enviando..." : "Postularse ahora", disabled: applyLoading, action: onApply };
+      return { 
+        text: "✅ Ya estás participando en este proyecto", 
+        disabled: false, 
+        action: goToMyPractices,
+        type: "practicing"
+      };
     }
+    
+    // 2. Tiene oferta para ESTA vacante
+    if (hasOfferForThisVacancy) {
+      return { 
+        text: "🎉 ¡Tienes una oferta!", 
+        disabled: false, 
+        action: goToOffers,
+        type: "offer"
+      };
+    }
+    
+    // 3. Tiene práctica activa en OTRA vacante
+    if (hasActivePractice && !isParticipatingInThisVacancy) {
+      return { 
+        text: "⏸️ Ya tienes un proyecto activo", 
+        disabled: true, 
+        action: null,
+        type: "active_other"
+      };
+    }
+    
+    // 4. Ya postulada (estados normales: postulada o en_proceso)
+    if (applicationStatus && ['postulada', 'en_proceso'].includes(applicationStatus)) {
+      return { 
+        text: "✅ Ya postulada", 
+        disabled: true, 
+        action: null,
+        type: "applied"
+      };
+    }
+    
+    // 5. Cupos agotados
+    if (vacancy?.spots_left <= 0) {
+      return { 
+        text: "❌ Cupos agotados", 
+        disabled: true, 
+        action: null,
+        type: "full"
+      };
+    }
+    
+    // 6. Práctica completada anteriormente - puede postularse nuevamente
+    if (hasCompletedPracticeForThisVacancy) {
+      return { 
+        text: applyLoading ? "Enviando..." : "🔄 Postularse nuevamente", 
+        disabled: applyLoading, 
+        action: onApply,
+        type: "completed_retry"
+      };
+    }
+    
+    // 7. Postulación normal
+    return { 
+      text: applyLoading ? "Enviando..." : "📝 Postularse ahora", 
+      disabled: applyLoading, 
+      action: onApply,
+      type: "normal"
+    };
   };
 
   const buttonState = getApplyButtonState();
+
+  // DEBUG: Mostrar estados actuales
+  console.log("🔍 ESTADOS FINALES:", {
+    vacancyId: id,
+    isParticipatingInThisVacancy,
+    hasOfferForThisVacancy,
+    hasActivePractice,
+    appliedVacancyIds: appliedVacancyIds.includes(id),
+    hasCompletedPracticeForThisVacancy,
+    applicationStatus,
+    buttonText: buttonState.text,
+    buttonType: buttonState.type
+  });
 
   return (
     <>
@@ -389,8 +474,10 @@ export default function VacanteDetallePage() {
                   </div>
                 </header>
 
-                {/* Mensaje de que ya está participando en ESTA vacante */}
-                {isParticipatingInThisVacancy && (
+                {/* Mensajes de estado - CORREGIDO */}
+                
+                {/* 1. Participando en ESTA vacante */}
+                {buttonState.type === "practicing" && (
                   <div style={{
                     background: "#f0f9ff",
                     border: "1px solid #0ea5e9",
@@ -415,34 +502,8 @@ export default function VacanteDetallePage() {
                   </div>
                 )}
 
-                {/* Mensaje de que tiene práctica activa (pero no en esta vacante) - USANDO EL HOOK */}
-                {hasActivePractice && !isParticipatingInThisVacancy && (
-                  <div style={{
-                    background: "#fef2f2",
-                    border: "1px solid #fecaca",
-                    borderRadius: "8px",
-                    padding: "16px",
-                    marginBottom: "16px",
-                    textAlign: "center"
-                  }}>
-                    <div style={{ 
-                      display: "flex", 
-                      alignItems: "center", 
-                      justifyContent: "center",
-                      gap: "8px",
-                      marginBottom: "8px"
-                    }}>
-                      <span style={{ fontSize: "24px" }}>⏸️</span>
-                      <strong style={{ color: "#dc2626" }}>Tienes un proyecto activo.</strong>
-                    </div>
-                    <p style={{ margin: 0, color: "#991b1b", fontSize: "14px" }}>
-                      No puedes postularte a otras vacantes mientras tengas un proyecto en curso.
-                    </p>
-                  </div>
-                )}
-
-                {/* Mensaje de oferta activa */}
-                {!isParticipatingInThisVacancy && !hasActivePractice && hasOfferForThisVacancy && (
+                {/* 2. Tiene oferta para ESTA vacante */}
+                {buttonState.type === "offer" && (
                   <div style={{
                     background: "#fffbeb",
                     border: "1px solid #f59e0b",
@@ -467,8 +528,34 @@ export default function VacanteDetallePage() {
                   </div>
                 )}
 
-                {/* Mensaje de práctica completada anteriormente */}
-                {!isParticipatingInThisVacancy && !hasActivePractice && !hasOfferForThisVacancy && hasCompletedPracticeForThisVacancy && (
+                {/* 3. Tiene práctica activa en OTRA vacante */}
+                {buttonState.type === "active_other" && (
+                  <div style={{
+                    background: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    borderRadius: "8px",
+                    padding: "16px",
+                    marginBottom: "16px",
+                    textAlign: "center"
+                  }}>
+                    <div style={{ 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "center",
+                      gap: "8px",
+                      marginBottom: "8px"
+                    }}>
+                      <span style={{ fontSize: "24px" }}>⏸️</span>
+                      <strong style={{ color: "#dc2626" }}>Ya tienes un proyecto activo</strong>
+                    </div>
+                    <p style={{ margin: 0, color: "#991b1b", fontSize: "14px" }}>
+                      No puedes postularte a otras vacantes mientras tengas un proyecto en curso.
+                    </p>
+                  </div>
+                )}
+
+                {/* 4. Práctica completada anteriormente */}
+                {buttonState.type === "completed_retry" && (
                   <div style={{
                     background: "#f0fdf4",
                     border: "1px solid #bbf7d0",
@@ -489,6 +576,32 @@ export default function VacanteDetallePage() {
                     </div>
                     <p style={{ margin: 0, color: "#166534", fontSize: "14px" }}>
                       Puedes postularte nuevamente a esta vacante.
+                    </p>
+                  </div>
+                )}
+
+                {/* 5. Ya postulada normalmente */}
+                {buttonState.type === "applied" && (
+                  <div style={{
+                    background: "#f0f9ff",
+                    border: "1px solid #0ea5e9",
+                    borderRadius: "8px",
+                    padding: "16px",
+                    marginBottom: "16px",
+                    textAlign: "center"
+                  }}>
+                    <div style={{ 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "center",
+                      gap: "8px",
+                      marginBottom: "8px"
+                    }}>
+                      <span style={{ fontSize: "24px" }}>✅</span>
+                      <strong style={{ color: "#0369a1" }}>Ya te has postulado a esta vacante</strong>
+                    </div>
+                    <p style={{ margin: 0, color: "#075985", fontSize: "14px" }}>
+                      Tu postulación está siendo revisada por la empresa.
                     </p>
                   </div>
                 )}
@@ -554,12 +667,14 @@ export default function VacanteDetallePage() {
                       width: "100%",
                       marginTop: 20,
                       opacity: buttonState.disabled ? 0.6 : 1,
-                      background: hasCompletedPracticeForThisVacancy ? "#f59e0b" : 
-                                 isParticipatingInThisVacancy ? "#0ea5e9" :
-                                 hasOfferForThisVacancy ? "#f59e0b" :
-                                 hasActivePractice ? "#f3f4f6" : "#2563eb",
-                      color: hasActivePractice ? "#6b7280" : "#fff",
-                      border: hasActivePractice ? "1px solid #d1d5db" : "none",
+                      background: 
+                        buttonState.type === "practicing" ? "#0ea5e9" :
+                        buttonState.type === "offer" ? "#f59e0b" :
+                        buttonState.type === "active_other" ? "#f3f4f6" :
+                        buttonState.type === "completed_retry" ? "#f59e0b" :
+                        buttonState.type === "applied" ? "#0ea5e9" : "#2563eb",
+                      color: buttonState.type === "active_other" ? "#6b7280" : "#fff",
+                      border: buttonState.type === "active_other" ? "1px solid #d1d5db" : "none",
                       cursor: buttonState.disabled ? "not-allowed" : "pointer"
                     }}
                   >

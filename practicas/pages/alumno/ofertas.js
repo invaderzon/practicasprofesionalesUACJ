@@ -155,7 +155,6 @@ export default function OfertasPage() {
 const acceptOffer = async (appId) => {
   if (!userId || !appId) return;
   
-  // USAR EL VALOR DEL HOOK
   if (hasActivePractice) { 
     alert("Ya tienes una práctica activa. No puedes aceptar otra oferta."); 
     return; 
@@ -165,13 +164,33 @@ const acceptOffer = async (appId) => {
   if (!ok) return;
   
   try {
+    // 1. EJECUTAR student_accept_offer ORIGINAL (esto notifica al profesor)
     const { error } = await supabase.rpc("student_accept_offer", { p_app_id: appId });
     if (error) throw error;
     
-    // Disparar evento global para actualizar todos los componentes
-    window.dispatchEvent(new CustomEvent('practiceStatusChanged'));
+    // 2. Notificación simple a la empresa (con la política RLS corregida)
+    const { data: offerData } = await supabase
+      .from("applications")
+      .select(`
+        student:students!applications_student_id_fkey (full_name),
+        vacancy:vacancies (title, company:companies(owner_id))
+      `)
+      .eq("id", appId)
+      .single();
+
+    if (offerData?.vacancy?.company?.owner_id) {
+      await supabase
+        .from("notifications")
+        .insert({
+          student_id: offerData.vacancy.company.owner_id,
+          type: "info",
+          title: "Oferta aceptada", 
+          body: `El alumno ${offerData.student.full_name} ha aceptado tu oferta para "${offerData.vacancy.title}".`,
+          action_url: `/empresa/postulaciones`
+        });
+    }
     
-    // Redirigir a mis prácticas
+    window.dispatchEvent(new CustomEvent('practiceStatusChanged'));
     router.push("/alumno/mis-practicas");
   } catch (e) {
     console.error(e);

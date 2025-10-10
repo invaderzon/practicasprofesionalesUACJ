@@ -626,13 +626,13 @@ export default function GrupoDetalle() {
                 </div>
 
                 {/* Vacantes donde el alumno está inscrito */}
-                {active.applications?.filter(app => app.decision === "accepted").length > 0 && (
+                {active.applications?.filter(app => app.status === "aceptada").length > 0 && (
                   <>
                     <hr className="jobs-sep" />
                     <div className="jobs-section">
                       <h3>Práctica actual</h3>
                       {active.applications
-                        .filter((app) => app.decision === "accepted")
+                        .filter((app) => app.status === "aceptada")
                         .map((app, idx) => (
                           <div key={idx} className="vacancy-detail-card" style={{ 
                             border: '1px solid #e4e7ee', 

@@ -276,32 +276,98 @@ export default function EmpresaPostulacionesPage() {
   };
 
   const updateApplicationStatus = async (applicationId, newStatus) => {
-    try {
-      const { error } = await supabase
-        .from("applications")
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", applicationId);
+  try {
+    // 1. Actualizar el estado de la aplicación
+    const { error: updateError } = await supabase
+      .from("applications")
+      .update({ 
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", applicationId);
 
-      if (error) throw error;
+    if (updateError) throw updateError;
 
-      // Actualizar el estado local
-      setApplications(prev => prev.map(app => 
-        app.id === applicationId ? { ...app, status: newStatus } : app
-      ));
+    // 2. Si es una oferta, crear notificación
+    if (newStatus === 'oferta') {
+      await createOfferNotification(applicationId);
+    }
 
-      // Actualizar selectedApp si es necesario
-      if (selectedApp && selectedApp.id === applicationId) {
-        setSelectedApp(prev => ({ ...prev, status: newStatus }));
+    // 3. Actualizar estado local
+    setApplications(prev => prev.map(app => 
+      app.id === applicationId ? { ...app, status: newStatus } : app
+    ));
+
+    if (selectedApp && selectedApp.id === applicationId) {
+      setSelectedApp(prev => ({ ...prev, status: newStatus }));
+    }
+
+    console.log(`Estado actualizado a: ${newStatus}`);
+
+  } catch (error) {
+    console.error("Error actualizando estado:", error);
+    alert("No se pudo actualizar el estado.");
+  }
+};
+
+// Función auxiliar corregida para crear notificación de oferta
+const createOfferNotification = async (applicationId) => {
+  try {
+    console.log("Creando notificación para aplicación:", applicationId);
+    
+    // Primero obtener los datos básicos de la aplicación
+    const { data: applicationData, error: appError } = await supabase
+      .from("applications")
+      .select(`
+        student_id,
+        vacancy_id,
+        vacancies (
+          title,
+          companies (
+            name
+          )
+        )
+      `)
+      .eq("id", applicationId)
+      .single();
+
+    if (appError) {
+      console.error("Error obteniendo aplicación:", appError);
+      return;
+    }
+
+    console.log("Datos de aplicación obtenidos:", applicationData);
+
+    if (applicationData && applicationData.vacancies) {
+      const companyName = applicationData.vacancies.companies?.name || "la empresa";
+      const vacancyTitle = applicationData.vacancies.title || "la vacante";
+      
+      // Llamar a la función de base de datos
+      const { data: notificationId, error: functionError } = await supabase
+        .rpc('create_company_notification', {
+          p_student_id: applicationData.student_id,
+          p_application_id: applicationId,
+          p_type: 'offer',
+          p_title: '¡Tienes una oferta! 🎉',
+          p_body: `${companyName} te ha enviado una oferta para: "${vacancyTitle}"`,
+          p_action_url: '/alumno/ofertas'
+        });
+
+      if (functionError) {
+        console.error("Error llamando a función de notificación:", functionError);
+        throw functionError;
       }
+      
+      console.log("✅ Notificación de oferta creada exitosamente. ID:", notificationId);
+    } else {
+      console.error("No se pudieron obtener los datos completos de la aplicación");
+    }
 
     } catch (error) {
-      console.error("Error actualizando estado:", error);
-      alert("No se pudo actualizar el estado.");
+      console.error("Error en createOfferNotification:", error);
     }
   };
+
 
   const handleSendOffer = (applicationId) => {
     if (confirm("¿Enviar oferta a este alumno?")) {

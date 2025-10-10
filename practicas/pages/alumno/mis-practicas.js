@@ -333,49 +333,61 @@ export default function MisPracticasPage() {
   }, [refreshKey.current, hasActivePractice, practiceLoading]);
 
   // Función para finalizar práctica con calificación
-  const handleCompletePractice = async () => {
-    if (selectedRating === 0) {
-      alert("Por favor, selecciona una calificación antes de continuar.");
-      return;
+  // En tu componente, modifica la función handleCompletePractice:
+const handleCompletePractice = async () => {
+  if (selectedRating === 0) {
+    alert("Por favor, selecciona una calificación antes de continuar.");
+    return;
+  }
+
+  setSubmittingRating(true);
+  try {
+    console.log("📤 Enviando calificación:", { 
+      userId: user.id, 
+      rating: selectedRating 
+    });
+    
+    // Llamar a la función RPC
+    const { error } = await supabase.rpc("complete_practice_with_rating", { 
+      p_student_id: user.id,
+      p_rating: selectedRating
+    });
+
+    if (error) {
+      console.error("❌ Error en RPC:", error);
+      throw error;
     }
 
-    setSubmittingRating(true);
-    try {
-      console.log("📤 Enviando calificación:", { userId: user.id, rating: selectedRating });
-      
-      const { data, error } = await supabase.rpc("complete_practice_with_rating", { 
-        p_student_id: user.id,
-        p_rating: selectedRating
-      });
-
-      if (error) {
-        console.error("❌ Error en RPC:", error);
-        throw error;
-      }
-
-      console.log("✅ RPC ejecutada exitosamente");
-      
-      // Disparar evento global para notificar a todos los componentes
-      window.dispatchEvent(new CustomEvent('practiceStatusChanged'));
-      
-      alert("¡Gracias por tu calificación! La práctica ha sido finalizada correctamente.");
-      setShowRatingModal(false);
-      setSelectedRating(0);
-      setRatingComment("");
-      
-      // Forzar recarga COMPLETA de datos
-      console.log("🔄 Recargando datos...");
-      refreshKey.current += 1;
-      setActivePractice(null);
-      
+    console.log("✅ Práctica finalizada y calificación guardada");
+    
+    // Disparar evento global para notificar a todos los componentes
+    window.dispatchEvent(new CustomEvent('practiceStatusChanged'));
+    
+    // Mostrar confirmación
+    alert("¡Gracias por tu calificación! La práctica ha sido finalizada correctamente y tu profesor ha sido notificado.");
+    
+    // Cerrar modal y resetear estado
+    setShowRatingModal(false);
+    setSelectedRating(0);
+    setRatingComment("");
+    
+    // Forzar recarga COMPLETA de datos
+    console.log("🔄 Recargando datos...");
+    refreshKey.current += 1;
+    setActivePractice(null);
+    
+    // Recargar la página después de un breve delay para asegurar que los datos se actualicen
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+    
     } catch (e) {
       console.error("💥 Error completo:", e);
-      alert(e.message || "No se pudo finalizar la práctica.");
+      alert(e.message || "No se pudo finalizar la práctica. Por favor, intenta nuevamente.");
     } finally {
       setSubmittingRating(false);
     }
   };
-
   // Función para abrir el modal de calificación
   const openRatingModal = () => {
     setShowRatingModal(true);
@@ -714,8 +726,8 @@ export default function MisPracticasPage() {
 
   const statusTone = (s) => {
     const k = String(s || "").toLowerCase();
-    if (k === "aceptada") return "success";
-    if (k === "oferta") return "warn";
+    if (k === "aceptada" || k === "oferta") return "success";
+    if (k === "en revisión" || k === "postulada") return "default";
     if (k === "rechazada" || k === "retirada") return "danger";
     return "default";
   };
@@ -939,6 +951,21 @@ export default function MisPracticasPage() {
               </div>
             )}
 
+            {/* Postulaciones Activas */}
+            {!loading && applied.length > 0 && (
+              <>
+                <h2 style={{ textAlign: "center" }}>Mis Postulaciones</h2>
+                {applied.map((v) => (
+                  <Card
+                    key={v.id}
+                    v={v}
+                    subtitle={`Postulada el ${fmtDate(v._applied_at)}`}
+                    actions={chip(`Estado: ${v._app_status || "-"}`, statusTone(v._app_status))}
+                  />
+                ))}
+              </>
+            )}
+
             {/* Favoritos */}
             <h2 style={{ textAlign: "center" }}>Vacantes de interés</h2>
             {loading && <div className="jobs-card sk" />}
@@ -968,6 +995,14 @@ export default function MisPracticasPage() {
                   }
                 />
               ))}
+
+            {/* Mensaje cuando no hay postulaciones activas */}
+            {!loading && applied.length === 0 && !hasActivePractice && (
+              <div style={{ textAlign: "center", marginTop: 20 }}>
+                <h2 style={{ textAlign: "center" }}>Mis Postulaciones</h2>
+                <div className="jobs-empty small">No tienes postulaciones activas.</div>
+              </div>
+            )}
 
             {/* Completadas (solo si hay) */}
             {completed.length > 0 && (

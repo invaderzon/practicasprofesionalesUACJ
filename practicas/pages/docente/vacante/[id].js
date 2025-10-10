@@ -200,14 +200,6 @@ export default function VacanteDetallePage() {
       <main className="jobs-wrap">
         <div className="jobs-grid" style={{ gridTemplateColumns: "1fr" }}>
           <article className="jobs-detail" style={{ display: "block" }}>
-            <button className="jobs-apply" onClick={onBack} style={{ 
-              marginBottom: 20, 
-              background: "#111827",
-              padding: "8px 16px",
-              fontSize: "14px"
-            }}>
-              ← Volver
-            </button>
 
             {loading && <div className="jobs-skeleton">Cargando…</div>}
             {!loading && err && <div className="jobs-error">{err}</div>}
