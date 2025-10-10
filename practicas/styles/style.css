@@ -7,6 +7,8 @@
   --color-azul-secundario: #2563eb;
   --color-azul-oscuro: #1f2937;
   --alto-navbar: 64px;
+  --inactive: #c0c8d6;
+  --inactive-contrast: #6870aa;
 }
 
 /* Reset básico y fondo general */
@@ -1287,3 +1289,421 @@ h1 {
     padding: 0.6rem 1.2rem;
   }
 }
+
+
+/*--------------------------------------------------------*/
+/* ---------------------PROFESOR-------------------------- */
+
+.jobs-searchbar.prof-search{
+  max-width: 640px;
+  margin: 12px auto 18px;
+}
+
+.prof-layout{
+  display:grid;
+  grid-template-columns: 420px 420px;
+  gap: 18px;
+  justify-content: center; 
+  align-items: start;
+}
+
+.prof-panel{
+  background:#fff;
+  border:1px solid #e4e7ee;
+  border-radius:12px;
+  padding:18px 20px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.06);
+}
+
+.prof-photo{
+  width: 120px;
+  height: 120px;
+  border-radius: 999px;
+  background: #e9eef6;
+  margin: 6px auto 10px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.prof-avatar-fallback{
+  width:100%; height:100%;
+  border-radius:999px;
+  background:#e5e7eb;
+  color:#374151;
+  display:grid; place-items:center;
+  font-weight:800; font-size:32px;
+}
+
+.prof-name{
+  margin: 6px 0 2px;
+  text-align:center;
+  font-size: 18px;
+  color: var(--color-principal);
+}
+
+.prof-mail{
+  text-align:center;
+  color:#374151;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.prof-info{
+  font-size: 13px;
+  color:#111827;
+  margin-top: 6px;
+  line-height: 1.35;
+}
+.prof-info strong{ font-weight:700; }
+
+.prof-actions{
+  display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px;
+}
+.prof-edit-row{ margin-top: 10px; }
+.prof-edit-form{ display:grid; gap:8px; margin-top: 10px; }
+.prof-input{
+  padding:10px 12px;
+  border:1px solid #d1d5db;
+  border-radius:10px;
+  background:#fff;
+  outline:none;
+  font-size:14px;
+}
+
+
+.prof-groups{
+  display:flex;
+  flex-direction:column;
+  gap: 12px;
+}
+
+
+.group-item{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  background:#fff;
+  border:1px solid #e4e7ee;
+  border-radius:10px;
+  padding: 12px 12px;
+  width:100%;
+  box-shadow: 0 2px 8px rgba(0,0,0,.05);
+  cursor:pointer;
+  text-align:left;
+  position: relative;
+}
+.group-item:hover{ transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+
+.grp-color{
+  width: 16px;
+  height: 44px;
+  border-radius: 8px;
+  flex: 0 0 16px;
+  background: var(--color-principal);
+}
+
+.grp-body{ flex:1; display:flex; flex-direction:column; line-height:1.2; }
+.grp-title{ color:#111827; font-weight:700; font-size: 13.5px; }
+.grp-sub{ color:#6b7280; font-size: 12px; margin-top: 2px; }
+
+/* Botón de tres puntos + menú */
+.grp-kebab{ position: relative; }
+.grp-kebab-btn{
+  background:none; border:none; cursor:pointer;
+  font-size: 20px; line-height: 18px; color:#374151;
+  padding: 4px 6px; border-radius: 8px;
+}
+.grp-kebab-btn:hover{ background:#f7f8fb; }
+
+.grp-menu-pop{
+  position:absolute;
+  right:0;
+  top: calc(100% + 6px);
+  background:#fff;
+  border:1px solid #e6eaf1;
+  border-radius:10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  padding:6px;
+  z-index:5;
+  min-width: 190px;
+}
+.menu-item{
+  width:100%;
+  text-align:left;
+  background:transparent;
+  border:none;
+  padding:8px 10px;
+  border-radius:8px;
+  color:#1f2937;
+  cursor:pointer;
+  font-size: 14px;
+}
+.menu-item:hover{ background:#f7f8fb; }
+.menu-item.danger{ color:#b91c1c; }
+
+.group-editor{
+  background:#fff; border:1px solid #e4e7ee; border-radius:10px; padding:12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.05);
+}
+.group-editor .row{
+  display:flex; align-items:center; gap:10px; margin-bottom:8px;
+}
+.color-input{
+  width: 16px;
+  height: 44px; 
+  border-radius:8px; 
+  padding:0;
+}
+
+
+@media (max-width: 960px){
+  .prof-layout{
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding-inline: 8px;
+  }
+}
+
+.alumno-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #374151;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+
+/* Botón “agregar” siempre arriba */
+.add-sticky{
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: transparent;
+  padding-bottom: 8px;
+}
+
+/* Formulario inline */
+.add-form{
+  background:#fff; border:1px solid #e6eaf1; border-radius:12px; padding:12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.06);
+}
+.add-title{
+  margin: 0 0 8px 0;
+  color: var(--color-principal);
+  font-size: 16px; font-weight: 800;
+}
+.add-results{
+  display: grid; gap: 6px; margin-top: 8px;
+  max-height: 220px; overflow: auto;
+}
+.result-item{
+  display:flex; align-items:center; gap:10px;
+  border:1px solid #e6eaf1; background:#fff; border-radius:10px; padding:8px 10px;
+  cursor:pointer; text-align:left;
+}
+.result-item:hover{ background:#f7f8fb; }
+.result-texts{ min-width:0; }
+.r-name{ font-weight:700; color:#1f2937; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.r-sub{ font-size:12px; color:#6b7280; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.preview-card{
+  border:1px solid #e6eaf1; background:#fff; border-radius:12px; padding:12px; margin-top:10px;
+}
+.prev-row{ display:flex; align-items:center; gap:12px; }
+.prev-name{ font-weight:800; color:#1f2937; }
+.prev-sub{ color:#6b7280; font-size:13px; }
+.prev-pill{
+  display:inline-block; margin-top:4px; font-size:12px; background:#f8fafc; border:1px solid #e6eaf1;
+  color:#475569; padding:4px 8px; border-radius:999px;
+}
+.prev-link{ display:inline-block; margin-left:8px; font-size:12px; color:#1e40af; text-decoration:underline; }
+.prev-note{
+  margin-top:8px; font-size:12px; color:#1f3354; background:#eaf2ff;
+  border:1px solid #cfe0ff; border-radius:8px; padding:6px 8px;
+}
+.prev-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
+
+.alumno-avatar-fallback{
+  border-radius:50%;
+  background:#e5e7eb;
+  color:#374151;
+  display:grid; place-items:center;
+  font-weight:800;
+}
+
+.group-new-card .jobs-card-body {
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+}
+.group-new-icon {
+  display: grid;
+  place-items: center;
+  width: 36px; height: 36px;
+  border-radius: 999px;
+  border: 2px solid #cbd5e1;
+  background: transparent;
+  font-weight: 800;
+  font-size: 22px;
+  color: #6b7280;
+}
+
+/* Menú de tres puntitos */
+.grp-kebab { position: relative; }
+.grp-kebab-btn {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: #6b7280;
+}
+.grp-menu {
+  position: absolute;
+  right: 0; top: 24px;
+  background: #fff;
+  border: 1px solid #e6eaf1;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.08);
+  z-index: 10;
+  padding: 6px 0;
+}
+.grp-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+}
+.grp-menu button:hover {
+  background: #f9fafb;
+}
+
+/* Header del formulario de agregar */
+.add-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* ESTILOS ACTUALIZADOS PARA TODOS LOS BOTONES GROUP-NEW */
+.group-new {
+  display: grid;
+  place-items: center;
+  height: 78px;
+  background: var(--inactive);
+  border-radius: 10px;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.group-new:hover {
+  background-color: var(--color-azul-secundario);
+  filter: brightness(0.98);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.group-new .plus {
+  color: var(--inactive-contrast);
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--inactive-contrast);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.group-new:hover .plus {
+  border-color: white;
+  color: white;
+  transform: scale(1.2);
+  border: 1px solid white;
+}
+
+/* Botón cancelar con animación */
+.cancel-btn {
+  transition: all 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background-color: #f8f9fa;
+  transform: translateY(-1px);
+}
+
+ .form-group {
+          margin-bottom: 16px;
+        }
+        .form-group label {
+          display: block;
+          margin-bottom: 6px;
+          font-weight: 600;
+          color: #333;
+          font-size: 14px;
+        }
+        .time-range-selector {
+          display: flex;
+          gap: 12px;
+          align-items: end;
+        }
+        .time-select-group {
+          flex: 1;
+        }
+        .time-select-group label {
+          display: block;
+          margin-bottom: 4px;
+          font-size: 12px;
+          color: #666;
+          font-weight: normal;
+        }
+        .time-select {
+          width: 100%;
+          padding: 8px 12px;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          background: white;
+          font-size: 14px;
+        }
+        .prof-input {
+          width: 100%;
+          padding: 8px 12px;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          font-size: 14px;
+          margin-bottom: 0;
+        }
+        .prof-edit-form {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .result-item:hover {
+          background: #f8f9fa;
+        }
+        .recommend-panel {
+          animation: slideDown 0.2s ease-out;
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 899px) {
+          .jobs-grid { grid-template-columns: 1fr !important; }
+          .jobs-detail { display: none !important; }
+        }
