@@ -6,7 +6,7 @@ import Footer from "../../components/footer";
 
 const DEFAULT_GROUP_COLOR = "#1F3354";
 
-// 👇 Selector de horas (array de horas en formato de 30 minutos)
+// Selector de horas (array de horas en formato de 30 minutos PORQUE ESTAMOS DESQUICIADOS) 
 const TIME_SLOTS = [
   "7:00 am", "7:30 am", "8:00 am", "8:30 am", "9:00 am", "9:30 am", 
   "10:00 am", "10:30 am", "11:00 am", "11:30 am", "12:00 pm", "12:30 pm", 
@@ -38,7 +38,7 @@ function AvatarCircle({ src, name }) {
   );
 }
 
-// 👇 Componente Selector de Horas
+// Componente Selector de Horas
 function TimeRangeSelector({ startTime, endTime, onStartTimeChange, onEndTimeChange }) {
   return (
     <div className="time-range-selector">
@@ -91,13 +91,13 @@ export default function ProfesorGruposPage() {
     institute: "", 
     office: "", 
     office_hours: "",
-    startTime: "", // 👈 Nuevo estado para hora de inicio
-    endTime: ""    // 👈 Nuevo estado para hora de fin
+    startTime: "", 
+    endTime: ""    
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  // 👇 Lista de institutos
+  // Lista de institutos
   const [institutes, setInstitutes] = useState([]);
 
   // grupos
@@ -129,7 +129,7 @@ export default function ProfesorGruposPage() {
       }
       setUser(u);
 
-      // 👇 Cargar lista de institutos
+      // Cargar lista de institutos
       const { data: institutesList } = await supabase
         .from("institutes")
         .select("id, code, name")
@@ -151,7 +151,7 @@ export default function ProfesorGruposPage() {
         prof?.institute ||
         "";
 
-      // 👇 Parsear horas de office_hours si existen
+      // Parsear horas de office_hours si existen
       let startTime = "";
       let endTime = "";
       if (prof?.office_hours) {
@@ -174,7 +174,7 @@ export default function ProfesorGruposPage() {
       };
       setProfile(profUi);
       setForm({
-        institute: prof?.institute_id || "", // 👈 Ahora guardamos el ID
+        institute: prof?.institute_id || "", 
         office: profUi.office,
         office_hours: profUi.office_hours,
         startTime,
@@ -207,7 +207,7 @@ export default function ProfesorGruposPage() {
     try {
       setSavingProfile(true);
 
-      // 👇 Construir el string de horario a partir de las horas seleccionadas
+      // Construir el string de horario a partir de las horas seleccionadas
       let officeHoursValue = "";
       if (form.startTime && form.endTime) {
         officeHoursValue = `${form.startTime} a ${form.endTime}`;
@@ -216,8 +216,8 @@ export default function ProfesorGruposPage() {
       const update = {
         office: form.office?.trim() || null,
         office_hours: officeHoursValue || null,
-        institute: null, // 👈 Ya no usamos el texto libre
-        institute_id: form.institute || null, // 👈 Usamos el ID del instituto
+        institute: null, 
+        institute_id: form.institute || null, 
       };
 
       const { error } = await supabase.from("profiles").update(update).eq("id", user.id);
@@ -233,7 +233,7 @@ export default function ProfesorGruposPage() {
   };
 
   const onCancelProfile = () => {
-    // 👇 Restaurar valores originales al cancelar
+    // Restaurar valores originales al cancelar
     let startTime = "";
     let endTime = "";
     if (profile?.office_hours) {
@@ -434,7 +434,7 @@ export default function ProfesorGruposPage() {
       <Navbar />
 
       <main className="jobs-wrap" style={{ maxWidth: 1200, marginInline: "auto" }}>
-        {/* Buscador SIN lupa */}
+        {/* Buscador */}
         <div className="jobs-searchbar prof-search">
           <div className="jobs-input">
             <input
@@ -487,7 +487,7 @@ export default function ProfesorGruposPage() {
               </div>
             ) : (
               <div className="prof-edit-form">
-                {/* 👇 Selector de Instituto */}
+                {/* Selector de Instituto */}
                 <div className="form-group">
                   <label>Instituto:</label>
                   <select
@@ -504,7 +504,7 @@ export default function ProfesorGruposPage() {
                   </select>
                 </div>
 
-                {/* 👇 Selector de Horario */}
+                {/* Selector de Horario */}
                 <div className="form-group">
                   <label>Horario de atención:</label>
                   <TimeRangeSelector

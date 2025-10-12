@@ -43,7 +43,7 @@ export default function GrupoDetalle() {
   // programas (para mapear id -> nombre)
   const [programs, setPrograms] = useState([]);
   
-  // 👇 Programa del profesor
+  // Programa del profesor
   const [professorProgramId, setProfessorProgramId] = useState(null);
 
   // ---- Búsqueda de alumnos ----
@@ -55,8 +55,8 @@ export default function GrupoDetalle() {
   const [results, setResults] = useState([]);
   const [candidate, setCandidate] = useState(null);
   const [alreadyInGroup, setAlreadyInGroup] = useState(false);
-  const [alreadyInOtherGroup, setAlreadyInOtherGroup] = useState(false); // 👈 NUEVO: para controlar si está en otro grupo
-  const [existingGroupInfo, setExistingGroupInfo] = useState(null); // 👈 NUEVO: información del grupo existente
+  const [alreadyInOtherGroup, setAlreadyInOtherGroup] = useState(false); // 
+  const [existingGroupInfo, setExistingGroupInfo] = useState(null); // 
   const [savingAdd, setSavingAdd] = useState(false);
   const searchSeq = useRef(0);
 
@@ -76,7 +76,7 @@ export default function GrupoDetalle() {
         .order("name", { ascending: true });
       setPrograms(progList || []);
 
-      // 👇 Obtener el programa del profesor
+      // Obtener el programa del profesor
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: professorProfile } = await supabase
@@ -134,14 +134,14 @@ export default function GrupoDetalle() {
       const my = ++searchSeq.current;
       const like = `%${q}%`;
       
-      // 👇 Construir consulta base
+      // Construir consulta base
       let queryBuilder = supabase
         .from("profiles")
         .select("id, full_name, email, avatar_url, cv_url, program_id")
         .eq("role", "student")
         .or(`full_name.ilike.${like},email.ilike.${like}`);
 
-      // 👇 Filtrar por programa del profesor si existe
+      // Filtrar por programa del profesor si existe
       if (professorProgramId) {
         queryBuilder = queryBuilder.eq("program_id", professorProgramId);
       }
@@ -159,7 +159,7 @@ export default function GrupoDetalle() {
     return () => { ignore = true; };
   }, [addingOpen, query, professorProgramId]);
 
-  // 👇 VERIFICAR SI EL CANDIDATO YA ESTÁ EN ESTE GRUPO U OTRO GRUPO
+  // VERIFICAR SI EL CANDIDATO YA ESTÁ EN ESTE GRUPO U OTRO GRUPO
   useEffect(() => {
     const checkCandidate = async () => {
       if (!candidate?.id || !groupId) { 
@@ -194,7 +194,7 @@ export default function GrupoDetalle() {
             )
           `)
           .eq("student_id", candidate.id)
-          .neq("group_id", groupId); // 👈 Excluir este grupo
+          .neq("group_id", groupId); // Excluir este grupo
 
         if (error) throw error;
 
@@ -222,7 +222,7 @@ export default function GrupoDetalle() {
   }, [candidate?.id, groupId]);
 
   const onAddConfirm = async () => {
-    // 👇 PREVENIR AGREGAR SI YA ESTÁ EN OTRO GRUPO
+    // PREVENIR AGREGAR SI YA ESTÁ EN OTRO GRUPO
     if (!candidate?.id || !groupId || alreadyInOtherGroup) return;
     
     try {
@@ -263,8 +263,8 @@ export default function GrupoDetalle() {
           setResults([]);
           setCandidate(null);
           setAlreadyInGroup(false);
-          setAlreadyInOtherGroup(false); // 👈 Limpiar estado
-          setExistingGroupInfo(null); // 👈 Limpiar información
+          setAlreadyInOtherGroup(false); 
+          setExistingGroupInfo(null); 
         }, 250);
       } else {
         setAddingOpen(false);
@@ -272,8 +272,8 @@ export default function GrupoDetalle() {
         setResults([]);
         setCandidate(null);
         setAlreadyInGroup(false);
-        setAlreadyInOtherGroup(false); // 👈 Limpiar estado
-        setExistingGroupInfo(null); // 👈 Limpiar información
+        setAlreadyInOtherGroup(false); 
+        setExistingGroupInfo(null); 
       }
     } catch (e) {
       alert(e.message || "No se pudo agregar.");
@@ -295,8 +295,8 @@ export default function GrupoDetalle() {
         setResults([]);
         setCandidate(null);
         setAlreadyInGroup(false);
-        setAlreadyInOtherGroup(false); // 👈 Limpiar estado
-        setExistingGroupInfo(null); // 👈 Limpiar información
+        setAlreadyInOtherGroup(false); 
+        setExistingGroupInfo(null); 
       }, 250);
     } else {
       setAddingOpen(false);
@@ -304,8 +304,8 @@ export default function GrupoDetalle() {
       setResults([]);
       setCandidate(null);
       setAlreadyInGroup(false);
-      setAlreadyInOtherGroup(false); // 👈 Limpiar estado
-      setExistingGroupInfo(null); // 👈 Limpiar información
+      setAlreadyInOtherGroup(false); 
+      setExistingGroupInfo(null); 
     }
   };
 
@@ -432,7 +432,7 @@ export default function GrupoDetalle() {
                       </button>
                     </div>
                     
-                    {/* 👇 Mensaje informativo sobre el filtro por programa */}
+                    {/* Mensaje informativo sobre el filtro por programa */}
                     {professorProgramId && (
                       <div style={{ 
                         fontSize: '12px', 
@@ -500,14 +500,14 @@ export default function GrupoDetalle() {
                           </div>
                         </div>
 
-                        {/* 👇 MENSAJE SI YA ESTÁ EN ESTE GRUPO */}
+                        {/* MENSAJE SI YA ESTÁ EN ESTE GRUPO */}
                         {alreadyInGroup && (
                           <div className="prev-note info">
                             Este alumno ya forma parte de este grupo.
                           </div>
                         )}
 
-                        {/* 👇 MENSAJE SI YA ESTÁ EN OTRO GRUPO */}
+                        {/* MENSAJE SI YA ESTÁ EN OTRO GRUPO */}
                         {alreadyInOtherGroup && existingGroupInfo && (
                           <div className="prev-note warning" style={{ 
                             backgroundColor: '#fef3cd', 
@@ -530,7 +530,7 @@ export default function GrupoDetalle() {
                         <div className="prev-actions">
                           <button className="btn btn-ghost" onClick={onAddDiscard}>Descartar</button>
                           
-                          {/* 👇 BOTÓN DESHABILITADO SI YA ESTÁ EN OTRO GRUPO */}
+                          {/* BOTÓN DESHABILITADO SI YA ESTÁ EN OTRO GRUPO */}
                           <button 
                             className="btn btn-primary" 
                             onClick={onAddConfirm} 
@@ -551,7 +551,7 @@ export default function GrupoDetalle() {
               )}
             </div>
 
-            {/* Alumnos - MANTIENE ORDEN ORIGINAL */}
+            {/* Alumnos */}
             {!loading && filteredStudents.map((s) => (
               <div
                 key={s.id}
@@ -586,7 +586,7 @@ export default function GrupoDetalle() {
             )}
           </aside>
 
-          {/* 👇 DETALLE DEL ALUMNO (COLUMNA DERECHA) - ESTA ES LA PARTE QUE FALTABA */}
+          {/* DETALLE DEL ALUMNO (COLUMNA DERECHA) */}
           <section className="jobs-detail" style={{ display: "block" }}>
             {!active ? (
               <div className="jobs-empty small">Selecciona un alumno.</div>
@@ -622,7 +622,14 @@ export default function GrupoDetalle() {
 
                 <div className="jobs-section">
                   <h3>Estado de prácticas:</h3>
-                  <p>{active.practices ? "Activo" : "No inscrito"}</p>
+                  <p>
+                    {active.practices && active.practices.length > 0 
+                      ? active.practices.some(p => p.status === 'active') 
+                        ? "Activo" 
+                        : "Práctica finalizada" 
+                      : "No inscrito"
+                    }
+                  </p>
                 </div>
 
                 {/* Vacantes donde el alumno está inscrito */}

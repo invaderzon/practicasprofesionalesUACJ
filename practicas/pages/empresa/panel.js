@@ -1,4 +1,3 @@
-// pages/empresa/perfil.js
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Navbar from "../../components/navbar";
@@ -20,7 +19,7 @@ export default function EmpresaPerfilPage() {
   const [company, setCompany] = useState(null);
 
   const [kpi, setKpi] = useState({ vacTotal: 0, vacActivas: 0, postulaciones: 0 });
-  const [recentApps, setRecentApps] = useState([]); // 🔹 últimas postulaciones
+  const [recentApps, setRecentApps] = useState([]);
 
   const [form, setForm] = useState({
     name: "",
@@ -37,7 +36,6 @@ export default function EmpresaPerfilPage() {
   };
 
   const handleAppClick = (app) => {
-    // Redirigir a la página de gestión de postulaciones
     router.push("/empresa/postulaciones");
   };
 
@@ -83,7 +81,7 @@ export default function EmpresaPerfilPage() {
         if (ignore) return;
         setCompany(comp);
 
-        // KPIs - VERSIÓN OPTIMIZADA
+        // KPI
         const { data: vacs } = await supabase
           .from("vacancies")
           .select("id, status, created_at")
@@ -94,19 +92,26 @@ export default function EmpresaPerfilPage() {
         const vacTotal = vacList.length;
         const vacActivas = vacList.filter((v) => isActive(v.status)).length;
 
-        // CONTAR POSTULACIONES - MÉTODO CONFIABLE
+        // CONTAR POSTULACIONES - VERSIÓN CORREGIDA 👇
         let postulaciones = 0;
         if (vacList.length > 0) {
           const vacancyIds = vacList.map(v => v.id);
           
           const { data: allApplications, error: appsError } = await supabase
             .from("applications")
-            .select("id, vacancy_id")
+            .select("id, vacancy_id, status")
             .in("vacancy_id", vacancyIds);
           
           if (!appsError && allApplications) {
-            postulaciones = allApplications.length;
-            console.log("✅ Postulaciones encontradas:", postulaciones);
+            // Filtrar solo postulaciones activas (pendientes, oferta, aceptadas)
+            const activeApplications = allApplications.filter(app => 
+              ['postulada', 'pendiente', 'revisada', 'entrevista', 'oferta', 'aceptada']
+                .includes(app.status?.toLowerCase())
+            );
+            
+            postulaciones = activeApplications.length;
+            console.log("✅ Postulaciones activas encontradas:", postulaciones);
+            console.log("📊 Total de postulaciones (todas):", allApplications.length);
           } else {
             console.error("❌ Error contando postulaciones:", appsError);
           }
@@ -244,7 +249,7 @@ export default function EmpresaPerfilPage() {
                 <div className="kpi-value">{kpi.vacActivas}</div>
               </div>
               <div className="kpi-card">
-                <div className="kpi-label">Postulaciones</div>
+                <div className="kpi-label">Postulaciones activas</div>
                 <div className="kpi-value">{kpi.postulaciones}</div>
               </div>
             </section>
@@ -438,7 +443,7 @@ export default function EmpresaPerfilPage() {
                     className="btn btn-ghost"
                     onClick={() => router.push("/empresa/postulaciones")}
                   >
-                    Ver todas las postulaciones
+                    Ver postulaciones activas
                   </button>
                 </div>
 

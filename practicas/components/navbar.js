@@ -1,4 +1,3 @@
-// components/Navbar.js
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -75,7 +74,7 @@ export default function Navbar() {
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState("");
-  const [userAvatar, setUserAvatar] = useState(""); // 👈 Nuevo estado para avatar
+  const [userAvatar, setUserAvatar] = useState(""); 
   const [userOpen, setUserOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const menuRef = useRef(null);
@@ -83,7 +82,6 @@ export default function Navbar() {
   const [portalMenuOpen, setPortalMenuOpen] = useState(false);
   const togglePortalMenu = () => setPortalMenuOpen((s) => !s);
 
-  // Cargar perfil (actualizado para incluir avatar)
   useEffect(() => {
     let ignore = false;
     const loadUser = async () => {
@@ -221,7 +219,6 @@ export default function Navbar() {
             {(userOpen || closing) && (
               <div ref={menuRef} className={`menu-usuario ${closing ? "cerrando" : (userOpen ? "abierto" : "")}`}>
                 <div className="cuenta">
-                  {/* 👇 También actualizar el avatar en el menú desplegable */}
                   <UserAvatar src={userAvatar} name={userName} size={40} />
                   <div className="datos">
                     <span className="nombre">{userName}</span>
@@ -255,13 +252,15 @@ export default function Navbar() {
 
 
 /* =======================
-   🔔 Componente Notificaciones (global)
-   ======================= */
+Componente Notificaciones (global)
+======================= */
+
 function NotificationsBell() {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [unread, setUnread] = useState(0);
-  const [items, setItems] = useState([]); // {id, type, title, body, action_url, created_at, read_at, ...}
+  const [items, setItems] = useState([]);
+  const [hasMarkedRead, setHasMarkedRead] = useState(false);
   const panelRef = useRef(null);
   const btnRef = useRef(null);
   const router = useRouter();
@@ -274,50 +273,59 @@ function NotificationsBell() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || ignore) return;
 
-      // 1) Unread count
-      const { data: unreadRows } = await supabase
+      if (!hasMarkedRead) {
+        const { data: unreadRows } = await supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: false })
+          .eq("student_id", user.id)
+          .is("read_at", null);
+
+        setUnread((unreadRows || []).length);
+      }
+
+      const { data: list, error } = await supabase
         .from("notifications")
-        .select("id", { count: "exact", head: false })
+        .select(`
+          id,
+          type,
+          title,
+          body,
+          action_url,
+          created_at,
+          read_at
+        `)
         .eq("student_id", user.id)
-        .is("read_at", null);
+        .order("created_at", { ascending: false })
+        .limit(20);
 
-      setUnread((unreadRows || []).length);
-      
-const { data: list, error } = await supabase
-      .from("notifications")
-      .select(`
-        id,
-        type,
-        title,
-        body,
-        action_url,
-        created_at,
-        read_at
-      `)
-      .eq("student_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    if (error) console.error("notifications list error:", error);
-    if (!ignore && list) setItems(list);
+      if (error) console.error("notifications list error:", error);
+      if (!ignore && list) setItems(list);
 
     })();
 
-    // Realtime: nuevas notificaciones al vuelo
     let channel;
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      
       channel = supabase
         .channel(`notif_user_${user.id}`)
         .on(
           "postgres_changes",
-          { event: "INSERT", schema: "public", table: "notifications", filter: `student_id=eq.${user.id}` },
+          { 
+            event: "INSERT", 
+            schema: "public", 
+            table: "notifications", 
+            filter: `student_id=eq.${user.id}` 
+          },
           (payload) => {
             const n = payload.new;
             setItems((prev) => [n, ...prev].slice(0, 20));
-            setUnread((u) => u + 1);
-            // pequeña animación de “ping” en el badge por CSS (ver .notif-ping class)
+            // SOLO incrementar si es una notificación nueva no leída
+            if (!n.read_at) {
+              setUnread((u) => u + 1);
+            }
+            
             try {
               btnRef.current?.classList.add("notif-ping");
               setTimeout(() => btnRef.current?.classList.remove("notif-ping"), 600);
@@ -331,7 +339,7 @@ const { data: list, error } = await supabase
       ignore = true;
       if (channel) supabase.removeChannel(channel);
     };
-  }, []);
+  }, [hasMarkedRead]); 
 
   // Abrir/cerrar con animación
   const openPanel = () => { setClosing(false); setOpen(true); };
@@ -340,33 +348,37 @@ const { data: list, error } = await supabase
     setClosing(true);
     setTimeout(() => { setOpen(false); setClosing(false); }, 220);
   };
-  const togglePanel = async () => {
-    if (open && !closing) {
-      closePanel();
-      return;
-    }
-    openPanel();
 
-    // Al abrir, marca todo como leído
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      if (unread > 0) {
-        const nowIso = new Date().toISOString();
-        const { error } = await supabase
-          .from("notifications")
-          .update({ read_at: nowIso })
-          .eq("student_id", user.id)
-          .is("read_at", null);
-        if (error) console.error("mark read error:", error);
+  const togglePanel = async () => {
+  if (open && !closing) {
+    closePanel();
+    return;
+  }
+  openPanel();
+
+  // Al abrir, marca todo como leído SOLO si hay notificaciones sin leer
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    if (unread > 0) {
+      const nowIso = new Date().toISOString();
+      
+      const { error } = await supabase.rpc('mark_notifications_as_read');
+      
+      console.log("RPC mark read - error:", error); // Debug
+      
+      if (error) {
+        console.error("RPC mark read error:", error);
+      } else {
         setUnread(0);
         setItems((prev) => prev.map((x) => ({ ...x, read_at: x.read_at || nowIso })));
       }
+    }
     } catch (e) {
       console.error(e);
     }
   };
-
   // Cerrar al hacer click fuera / ESC
   useEffect(() => {
     if (!open && !closing) return;
@@ -424,8 +436,8 @@ const { data: list, error } = await supabase
           >
             <header className="notif-head">
               <h4>Notificaciones</h4>
-              {items.length > 0 ? (
-                <span className="notif-sub">{items.filter(i => !i.read_at).length} sin leer</span>
+              {items.length > 0 && unread > 0 ? (
+                <span className="notif-sub">{unread} sin leer</span>
               ) : null}
             </header>
 
@@ -476,7 +488,6 @@ function timeAgo(iso) {
 }
 
 function iconForType(type) {
-  // colores los da CSS por clase .notif-ico.offer / .rejected / .auto_declined / .info
   if (type === "offer") {
     return (
       <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>

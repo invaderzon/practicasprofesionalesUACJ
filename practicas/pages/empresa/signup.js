@@ -1,4 +1,3 @@
-// pages/empresa/signup.js
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
@@ -39,7 +38,6 @@ export default function EmpresaSignup() {
     try {
       setLoading(true);
 
-      // 1) Crear usuario (Auth)
       const { data, error } = await supabase.auth.signUp({
         email: mail,
         password,
@@ -47,15 +45,12 @@ export default function EmpresaSignup() {
       });
       if (error) throw error;
 
-      // 2) Si el usuario ya existe en sesión de signUp (depende si confirmas por email)
       if (data.user) {
-        // 2a) Asegura perfil con rol company
         await supabase
           .from('profiles')
           .update({ role: 'company', full_name: name })
           .eq('id', data.user.id);
 
-        // 2b) Crea empresa y la vincula al owner
         await supabase.from('companies').insert({
           name,
           email: mail,
@@ -63,7 +58,6 @@ export default function EmpresaSignup() {
         });
       }
 
-      // 3) Redirige al login (aunque requiera confirmación de correo)
       router.replace('/login');
     } catch (e) {
       setErr(e.message || 'No se pudo completar el registro.');
@@ -75,7 +69,7 @@ export default function EmpresaSignup() {
   return (
     <>
       <Navbar />
-      <main className="login-wrap">{/* reutiliza estilos del login */}
+      <main className="login-wrap">
         <div className="login-card">
           {/* Panel izquierdo (decorativo) */}
           <div className="login-left" />

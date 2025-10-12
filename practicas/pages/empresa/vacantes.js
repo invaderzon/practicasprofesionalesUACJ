@@ -83,15 +83,15 @@ export default function EmpresaVacantesPage() {
   const [err, setErr] = useState("");
 
   /* ---------- BD: catálogos ---------- */
-  const [programs, setPrograms] = useState([]); // [{id,key,name}]
+  const [programs, setPrograms] = useState([]); 
 
   /* ---------- BD: empresa y data ---------- */
   const [company, setCompany] = useState(null);
-  const [vacancies, setVacancies] = useState([]); // cada vacante con .program_ids: uuid[]
+  const [vacancies, setVacancies] = useState([]); 
   const [selected, setSelected] = useState(null);
 
   /* ---------- UI: modos panel derecho ---------- */
-  const [mode, setMode] = useState("view"); // 'view' | 'edit' | 'apps'
+  const [mode, setMode] = useState("view"); 
   const [editForm, setEditForm] = useState(null);
 
   /* ---------- BD: postulaciones ---------- */
@@ -102,8 +102,8 @@ export default function EmpresaVacantesPage() {
 
   /* ---------- UI: búsqueda / filtros ---------- */
   const [q, setQ] = useState("");
-  const [fltEstado, setFltEstado] = useState(""); // "", "activa", "inactiva"
-  const [fltCupo, setFltCupo] = useState("");     // "", "con_cupo", "llenas"
+  const [fltEstado, setFltEstado] = useState(""); 
+  const [fltCupo, setFltCupo] = useState("");     
 
   /* ---------- UI: kebab ---------- */
   const [openMenuDetail, setOpenMenuDetail] = useState(false);
@@ -500,8 +500,8 @@ export default function EmpresaVacantesPage() {
     // NUEVO: llama a la RPC que acepta y notifica
     const { error } = await supabase.rpc("company_accept_application", {
       p_application_id: appId,
-      p_offer_note: null,    // opcional: un texto que verá el alumno
-      p_days_to_expire: days // opcional: días para que expire la oferta (int)
+      p_offer_note: null,    
+      p_days_to_expire: days 
     });
     if (error) throw error;
 

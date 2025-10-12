@@ -1,4 +1,3 @@
-// pages/alumno/vacante/[id].js
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/router";
 import Navbar from "../../../components/navbar";

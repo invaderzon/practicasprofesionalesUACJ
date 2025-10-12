@@ -5,7 +5,7 @@ import Navbar from "../../../components/navbar";
 import Footer from "../../../components/footer";
 import { supabase } from "../../../lib/supabaseClient";
 
-/* --- helpers UI<->BD para mostrar bonito --- */
+/* --- helpers UI--- */
 const MAP_DB_TO_UI = {
   modalidad: { presencial: "Presencial", "híbrido": "Híbrida", remoto: "Remota" },
   comp: { "Apoyo económico": "Apoyo económico", "Sin apoyo": "Sin apoyo" },
@@ -146,7 +146,7 @@ export default function EmpresaVacanteDetallePage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("detalles"); // "detalles" | "postulaciones"
+  const [activeTab, setActiveTab] = useState("detalles"); 
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState(null);
 

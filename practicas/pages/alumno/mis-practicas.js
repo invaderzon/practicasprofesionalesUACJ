@@ -1,4 +1,3 @@
-// pages/alumno/mis-practicas.js
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
@@ -6,16 +5,14 @@ import Navbar from "../../components/navbar";
 import Footer from "../../components/footer";
 import { useActivePractice } from '../../components/hooks/useActivePractice';
 
-// Estados que consideraremos como "completadas" (compararemos en minúsculas)
+
 const COMPLETED_STATES = ["completada","terminada","finalizada","completed","finished","done"];
 
-// --- helper: cache-busting para ver inmediatamente lo recién subido ---
 const cacheBust = (url) => {
   if (!url) return url;
   return url.includes("?") ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`;
 };
 
-// Validación simple de extensión (evita nombres raros)
 function validateExt(ext) {
   if (!ext || ext.includes("/")) throw new Error("Nombre de archivo inválido.");
 }
@@ -129,211 +126,211 @@ export default function MisPracticasPage() {
   const bump = () => (refreshKey.current += 1);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setErr("");
+  const load = async () => {
+    setLoading(true);
+    setErr("");
 
-      // 1) Usuario
-      const { data: { user: u }, error: uErr } = await supabase.auth.getUser();
-      if (uErr || !u) {
-        setErr(uErr?.message || "No se pudo obtener el usuario.");
-        setLoading(false);
-        return;
-      }
-      setUser(u);
+    // Usuario
+    const { data: { user: u }, error: uErr } = await supabase.auth.getUser();
+    if (uErr || !u) {
+      setErr(uErr?.message || "No se pudo obtener el usuario.");
+      setLoading(false);
+      return;
+    }
+    setUser(u);
 
-      // 2) Perfil + programa
-      const { data: prof, error: pErr } = await supabase
-        .from("profiles")
-        .select(`
+    // Perfil + programa
+    const { data: prof, error: pErr } = await supabase
+      .from("profiles")
+      .select(`
+        id,
+        full_name,
+        program_id,
+        avatar_url,
+        cv_url,
+        program:programs (
+          id, key, name, faculty
+        )
+      `)
+      .eq("id", u.id)
+      .single();
+
+    if (pErr) {
+      setErr(pErr.message);
+      setLoading(false);
+      return;
+    }
+
+    // Cargar información del grupo y profesor
+    const { data: groupMembers, error: gmErr } = await supabase
+      .from("group_members")
+      .select(`
+        group:groups (
           id,
-          full_name,
-          program_id,
-          avatar_url,
-          cv_url,
-          program:programs (
-            id, key, name, faculty
-          )
-        `)
-        .eq("id", u.id)
+          name,
+          color,
+          professor_id
+        )
+      `)
+      .eq("student_id", u.id)
+      .maybeSingle();
+
+    let groupInfo = null;
+    let professorInfo = null;
+
+    if (groupMembers?.group) {
+      groupInfo = groupMembers.group;
+      
+      const { data: profData } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .eq("id", groupInfo.professor_id)
         .single();
+      
+      professorInfo = profData;
+    }
 
-      if (pErr) {
-        setErr(pErr.message);
-        setLoading(false);
-        return;
-      }
+    setProfile({
+      id: prof.id,
+      full_name: prof.full_name || "(Sin nombre)",
+      email: u.email || "",
+      avatar_url: cacheBust(prof.avatar_url || ""),
+      cv_url: prof.cv_url || "",
+      program: prof.program || null,
+      group: groupInfo,
+      professor: professorInfo
+    });
 
-      // 3) Cargar información del grupo y profesor
-      const { data: groupMembers, error: gmErr } = await supabase
-        .from("group_members")
+    // Verificar si tiene práctica activa - CORREGIDO
+    if (hasActivePractice) {
+      const { data: activePractice, error: practiceErr } = await supabase
+        .from("practices")
         .select(`
-          group:groups (
-            id,
-            name,
-            color,
-            professor_id
+          student_id,
+          vacancy:vacancies (
+            id, title, modality, compensation, language,
+            location_text, rating_avg, rating_count, created_at,
+            company:companies ( id, name, logo_url )
+          ),
+          application:applications (
+            id, applied_at, status, decision_at
           )
         `)
         .eq("student_id", u.id)
-        .maybeSingle();
+        .eq("status", 'active')
+        .single();
 
-      let groupInfo = null;
-      let professorInfo = null;
-
-      if (groupMembers?.group) {
-        groupInfo = groupMembers.group;
-        
-        const { data: profData } = await supabase
-          .from("profiles")
-          .select("id, full_name, email")
-          .eq("id", groupInfo.professor_id)
-          .single();
-        
-        professorInfo = profData;
+      if (practiceErr && practiceErr.code !== 'PGRST116') {
+        console.error("Error loading practice:", practiceErr);
       }
 
-      setProfile({
-        id: prof.id,
-        full_name: prof.full_name || "(Sin nombre)",
-        email: u.email || "",
-        avatar_url: cacheBust(prof.avatar_url || ""),
-        cv_url: prof.cv_url || "",
-        program: prof.program || null,
-        group: groupInfo,
-        professor: professorInfo
-      });
-
-      // 4) Verificar si tiene práctica activa - sincronizado con el hook
-      if (hasActivePractice) {
-        const { data: activePractice, error: practiceErr } = await supabase
-          .from("practices")
-          .select(`
-            student_id,
-            vacancy:vacancies (
-              id, title, modality, compensation, language,
-              location_text, rating_avg, rating_count, created_at,
-              company:companies ( id, name, logo_url )
-            ),
-            application:applications (
-              id, applied_at, status, decision_at
-            )
-          `)
-          .eq("student_id", u.id)
-          .eq("status", 'active')
-          .single();
-
-        if (practiceErr && practiceErr.code !== 'PGRST116') {
-          console.error("Error loading practice:", practiceErr);
-        }
-
-        if (activePractice?.vacancy) {
-          setActivePractice(activePractice);
-        } else {
-          setActivePractice(null);
-        }
+      if (activePractice?.vacancy) {
+        setActivePractice(activePractice);
       } else {
         setActivePractice(null);
       }
+    } else {
+      setActivePractice(null);
+    }
 
-      // 5) Favoritos
-      const { data: favs, error: fErr } = await supabase
-        .from("vacancy_favorites")
-        .select(`
-          id,
-          vacancy_id,
-          created_at,
-          vacancy:vacancies (
-            id, title, modality, compensation, language,
-            location_text, rating_avg, rating_count, created_at,
-            company:companies ( id, name, logo_url )
-          )
-        `)
-        .eq("student_id", u.id)
-        .order("created_at", { ascending: false });
+    // Favoritos
+    const { data: favs, error: fErr } = await supabase
+      .from("vacancy_favorites")
+      .select(`
+        id,
+        vacancy_id,
+        created_at,
+        vacancy:vacancies (
+          id, title, modality, compensation, language,
+          location_text, rating_avg, rating_count, created_at,
+          company:companies ( id, name, logo_url )
+        )
+      `)
+      .eq("student_id", u.id)
+      .order("created_at", { ascending: false });
 
-      if (fErr) {
-        setErr(fErr.message);
-        setLoading(false);
-        return;
-      }
-      const favVacancies = (favs || [])
-        .map((r) => ({ favRowId: r.id, ...r.vacancy }))
-        .filter((v) => !!v?.id);
-      setFavorites(favVacancies);
-
-      // 6) TODAS las aplicaciones del alumno
-      const { data: apps, error: aErr } = await supabase
-        .from("applications")
-        .select(`
-          id, status, applied_at,
-          vacancy:vacancies (
-            id, title, modality, compensation, language,
-            location_text, rating_avg, rating_count, created_at,
-            company:companies ( id, name, logo_url )
-          )
-        `)
-        .eq("student_id", u.id)
-        .order("applied_at", { ascending: false });
-
-      if (aErr) {
-        setErr(aErr.message);
-        setLoading(false);
-        return;
-      }
-
-      const appsClean = (apps || []).filter((r) => r?.vacancy?.id);
-      
-      const appliedList = appsClean
-        .filter((r) => {
-          const status = String(r.status || "").toLowerCase();
-          return !COMPLETED_STATES.includes(status) && status !== "rechazada";
-        })
-        .map((r) => ({ ...r.vacancy, _app_status: r.status, _applied_at: r.applied_at }));
-
-      const completedList = appsClean
-        .filter((r) => COMPLETED_STATES.includes(String(r.status || "").toLowerCase()))
-        .map((r) => ({ ...r.vacancy, _app_status: r.status, _applied_at: r.applied_at }));
-
-      setCompleted(completedList);
-      setApplied(appliedList);
-
-      // 7) Vacantes silenciadas
-      const { data: hidd, error: hErr } = await supabase
-        .from("vacancy_hidden")
-        .select(`
-          id,
-          vacancy_id, created_at,
-          vacancy:vacancies (
-            id, title, modality, compensation, language,
-            location_text, rating_avg, rating_count, created_at,
-            company:companies ( id, name, logo_url )
-          )
-        `)
-        .eq("student_id", u.id)
-        .order("created_at", { ascending: false });
-
-      if (hErr) {
-        setErr(hErr.message);
-        setLoading(false);
-        return;
-      }
-      const hiddenVacancies = (hidd || [])
-        .map((r) => ({ hiddenRowId: r.id, ...r.vacancy }))
-        .filter((v) => !!v?.id);
-      setHidden(hiddenVacancies);
-
+    if (fErr) {
+      setErr(fErr.message);
       setLoading(false);
-    };
+      return;
+    }
+    const favVacancies = (favs || [])
+      .map((r) => ({ favRowId: r.id, ...r.vacancy }))
+      .filter((v) => !!v?.id);
+    setFavorites(favVacancies);
+
+    // TODAS las aplicaciones del alumno
+    const { data: apps, error: aErr } = await supabase
+      .from("applications")
+      .select(`
+        id, status, applied_at,
+        vacancy:vacancies (
+          id, title, modality, compensation, language,
+          location_text, rating_avg, rating_count, created_at,
+          company:companies ( id, name, logo_url )
+        )
+      `)
+      .eq("student_id", u.id)
+      .order("applied_at", { ascending: false });
+
+    if (aErr) {
+      setErr(aErr.message);
+      setLoading(false);
+      return;
+    }
+
+    const appsClean = (apps || []).filter((r) => r?.vacancy?.id);
+    
+    const appliedList = appsClean
+      .filter((r) => {
+        const status = String(r.status || "").toLowerCase();
+        return !COMPLETED_STATES.includes(status) && status !== "rechazada";
+      })
+      .map((r) => ({ ...r.vacancy, _app_status: r.status, _applied_at: r.applied_at }));
+
+    const completedList = appsClean
+      .filter((r) => COMPLETED_STATES.includes(String(r.status || "").toLowerCase()))
+      .map((r) => ({ ...r.vacancy, _app_status: r.status, _applied_at: r.applied_at }));
+
+    setCompleted(completedList);
+    setApplied(appliedList);
+
+    // Vacantes silenciadas
+    const { data: hidd, error: hErr } = await supabase
+      .from("vacancy_hidden")
+      .select(`
+        id,
+        vacancy_id, created_at,
+        vacancy:vacancies (
+          id, title, modality, compensation, language,
+          location_text, rating_avg, rating_count, created_at,
+          company:companies ( id, name, logo_url )
+        )
+      `)
+      .eq("student_id", u.id)
+      .order("created_at", { ascending: false });
+
+    if (hErr) {
+      setErr(hErr.message);
+      setLoading(false);
+      return;
+    }
+    const hiddenVacancies = (hidd || [])
+      .map((r) => ({ hiddenRowId: r.id, ...r.vacancy }))
+      .filter((v) => !!v?.id);
+    setHidden(hiddenVacancies);
+
+    setLoading(false);
+  };
 
     // Solo cargar datos cuando el hook haya terminado de verificar
     if (!practiceLoading) {
       load();
     }
-  }, [refreshKey.current, hasActivePractice, practiceLoading]);
+  }, [refreshKey.current, hasActivePractice, practiceLoading]); 
+
 
   // Función para finalizar práctica con calificación
-  // En tu componente, modifica la función handleCompletePractice:
 const handleCompletePractice = async () => {
   if (selectedRating === 0) {
     alert("Por favor, selecciona una calificación antes de continuar.");
@@ -357,14 +354,12 @@ const handleCompletePractice = async () => {
       console.error("❌ Error en RPC:", error);
       throw error;
     }
-
-    console.log("✅ Práctica finalizada y calificación guardada");
     
     // Disparar evento global para notificar a todos los componentes
     window.dispatchEvent(new CustomEvent('practiceStatusChanged'));
     
     // Mostrar confirmación
-    alert("¡Gracias por tu calificación! La práctica ha sido finalizada correctamente y tu profesor ha sido notificado.");
+    alert("¡Gracias por tu calificación! Haz cerrado tu participación en este proyecto correctamente y tu profesor ha sido notificado.");
     
     // Cerrar modal y resetear estado
     setShowRatingModal(false);
@@ -372,7 +367,6 @@ const handleCompletePractice = async () => {
     setRatingComment("");
     
     // Forzar recarga COMPLETA de datos
-    console.log("🔄 Recargando datos...");
     refreshKey.current += 1;
     setActivePractice(null);
     
@@ -427,7 +421,7 @@ const handleCompletePractice = async () => {
 
       if (updErr) throw updErr;
 
-      // Aplicar cache-busting aquí también
+      // Aplicar cache-busting 
       setProfile((p) => ({ ...p, cv_url: cacheBust(publicUrl) }));
       bump(); // Forzar recarga para detectar correctamente el tipo de archivo
     } catch (e2) {
@@ -492,7 +486,7 @@ const handleCompletePractice = async () => {
       validateExt(ext);
       const path = `${user.id}/avatar.${ext}`;
 
-      // (Opcional) Limpia otros avatars con distinta extensión para no acumular
+      // Limpia otros avatars con distinta extensión para no acumular
       const { data: existing } = await supabase.storage.from("avatars").list(user.id);
       if (existing?.length) {
         const others = existing
@@ -519,7 +513,6 @@ const handleCompletePractice = async () => {
         .eq("id", user.id);
       if (updErr) throw updErr;
 
-      // En UI, muéstrala con cache-busting para ver la nueva al instante
       setProfile((p) => ({ ...p, avatar_url: cacheBust(publicUrl) }));
     } catch (e2) {
       console.error(e2);

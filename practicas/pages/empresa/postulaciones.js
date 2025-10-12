@@ -84,7 +84,7 @@ export default function EmpresaPostulacionesPage() {
   const [applications, setApplications] = useState([]);
   const [filteredApps, setFilteredApps] = useState([]);
   const [selectedVacancy, setSelectedVacancy] = useState("all");
-  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState("activas"); // 👈 Cambiado a "activas" por defecto
   const [vacancies, setVacancies] = useState([]);
   const [selectedApp, setSelectedApp] = useState(null);
 
@@ -213,7 +213,7 @@ export default function EmpresaPostulacionesPage() {
     };
   }, [router]);
 
-  // Filtrar postulaciones
+  // Filtrar postulaciones - VERSIÓN CORREGIDA 👇
   useEffect(() => {
     let filtered = applications;
     
@@ -222,7 +222,14 @@ export default function EmpresaPostulacionesPage() {
     }
     
     if (selectedStatus !== "all") {
-      filtered = filtered.filter(app => app.status === selectedStatus);
+      if (selectedStatus === "activas") {
+        // Mostrar solo postulaciones activas (no finalizadas/completadas)
+        filtered = filtered.filter(app => 
+          !['completada', 'finalizada'].includes(app.status?.toLowerCase())
+        );
+      } else {
+        filtered = filtered.filter(app => app.status === selectedStatus);
+      }
     }
     
     setFilteredApps(filtered);
@@ -232,31 +239,21 @@ export default function EmpresaPostulacionesPage() {
     }
   }, [selectedVacancy, selectedStatus, applications, selectedApp]);
 
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'postulada':
-      case 'pendiente':
-        return '#f59e0b'; // amber
-      case 'oferta':
-        return '#3b82f6'; // azul
-      case 'rechazada':
-        return '#ef4444'; // rojo
-      default:
-        return '#6b7280'; // gris
-    }
-  };
-
+  // Funciones corregidas para mapeo de estados 👇
   const getStatusText = (status) => {
     const statusMap = {
       'postulada': 'Pendiente',
       'pendiente': 'Pendiente',
-      'revisada': 'Pendiente',
-      'entrevista': 'Pendiente',
-      'oferta': 'Oferta',
-      'aceptada': 'Aceptada',
+      'revisada': 'Revisada',
+      'entrevista': 'En entrevista',
+      'oferta': 'Oferta enviada',
+      'aceptada': 'Práctica activa',
+      'completada': 'Práctica completada',
+      'finalizada': 'Práctica finalizada',
+      'cancelada': 'Cancelada',
       'rechazada': 'Rechazada'
     };
-    return statusMap[status?.toLowerCase()] || 'Pendiente';
+    return statusMap[status?.toLowerCase()] || status || 'Pendiente';
   };
 
   const getStatusBadgeTone = (status) => {
@@ -264,11 +261,18 @@ export default function EmpresaPostulacionesPage() {
       case 'postulada':
       case 'pendiente':
         return 'warning';
+      case 'revisada':
+      case 'entrevista':
+        return 'info';
       case 'oferta':
         return 'info';
       case 'aceptada':
         return 'success';
+      case 'completada':
+      case 'finalizada':
+        return 'muted';
       case 'rechazada':
+      case 'cancelada':
         return 'error';
       default:
         return 'muted';
@@ -276,98 +280,97 @@ export default function EmpresaPostulacionesPage() {
   };
 
   const updateApplicationStatus = async (applicationId, newStatus) => {
-  try {
-    // 1. Actualizar el estado de la aplicación
-    const { error: updateError } = await supabase
-      .from("applications")
-      .update({ 
-        status: newStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", applicationId);
+    try {
+      // 1. Actualizar el estado de la aplicación
+      const { error: updateError } = await supabase
+        .from("applications")
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", applicationId);
 
-    if (updateError) throw updateError;
+      if (updateError) throw updateError;
 
-    // 2. Si es una oferta, crear notificación
-    if (newStatus === 'oferta') {
-      await createOfferNotification(applicationId);
-    }
-
-    // 3. Actualizar estado local
-    setApplications(prev => prev.map(app => 
-      app.id === applicationId ? { ...app, status: newStatus } : app
-    ));
-
-    if (selectedApp && selectedApp.id === applicationId) {
-      setSelectedApp(prev => ({ ...prev, status: newStatus }));
-    }
-
-    console.log(`Estado actualizado a: ${newStatus}`);
-
-  } catch (error) {
-    console.error("Error actualizando estado:", error);
-    alert("No se pudo actualizar el estado.");
-  }
-};
-
-// Función auxiliar corregida para crear notificación de oferta
-const createOfferNotification = async (applicationId) => {
-  try {
-    console.log("Creando notificación para aplicación:", applicationId);
-    
-    // Primero obtener los datos básicos de la aplicación
-    const { data: applicationData, error: appError } = await supabase
-      .from("applications")
-      .select(`
-        student_id,
-        vacancy_id,
-        vacancies (
-          title,
-          companies (
-            name
-          )
-        )
-      `)
-      .eq("id", applicationId)
-      .single();
-
-    if (appError) {
-      console.error("Error obteniendo aplicación:", appError);
-      return;
-    }
-
-    console.log("Datos de aplicación obtenidos:", applicationData);
-
-    if (applicationData && applicationData.vacancies) {
-      const companyName = applicationData.vacancies.companies?.name || "la empresa";
-      const vacancyTitle = applicationData.vacancies.title || "la vacante";
-      
-      // Llamar a la función de base de datos
-      const { data: notificationId, error: functionError } = await supabase
-        .rpc('create_company_notification', {
-          p_student_id: applicationData.student_id,
-          p_application_id: applicationId,
-          p_type: 'offer',
-          p_title: '¡Tienes una oferta! 🎉',
-          p_body: `${companyName} te ha enviado una oferta para: "${vacancyTitle}"`,
-          p_action_url: '/alumno/ofertas'
-        });
-
-      if (functionError) {
-        console.error("Error llamando a función de notificación:", functionError);
-        throw functionError;
+      // 2. Si es una oferta, crear notificación
+      if (newStatus === 'oferta') {
+        await createOfferNotification(applicationId);
       }
-      
-      console.log("✅ Notificación de oferta creada exitosamente. ID:", notificationId);
-    } else {
-      console.error("No se pudieron obtener los datos completos de la aplicación");
+
+      // 3. Actualizar estado local
+      setApplications(prev => prev.map(app => 
+        app.id === applicationId ? { ...app, status: newStatus } : app
+      ));
+
+      if (selectedApp && selectedApp.id === applicationId) {
+        setSelectedApp(prev => ({ ...prev, status: newStatus }));
+      }
+
+      console.log(`Estado actualizado a: ${newStatus}`);
+
+    } catch (error) {
+      console.error("Error actualizando estado:", error);
+      alert("No se pudo actualizar el estado.");
     }
+  };
+
+  // Función auxiliar corregida para crear notificación de oferta
+  const createOfferNotification = async (applicationId) => {
+    try {
+      console.log("Creando notificación para aplicación:", applicationId);
+      
+      // Primero obtener los datos básicos de la aplicación
+      const { data: applicationData, error: appError } = await supabase
+        .from("applications")
+        .select(`
+          student_id,
+          vacancy_id,
+          vacancies (
+            title,
+            companies (
+              name
+            )
+          )
+        `)
+        .eq("id", applicationId)
+        .single();
+
+      if (appError) {
+        console.error("Error obteniendo aplicación:", appError);
+        return;
+      }
+
+      console.log("Datos de aplicación obtenidos:", applicationData);
+
+      if (applicationData && applicationData.vacancies) {
+        const companyName = applicationData.vacancies.companies?.name || "la empresa";
+        const vacancyTitle = applicationData.vacancies.title || "la vacante";
+        
+        // Llamar a la función de base de datos
+        const { data: notificationId, error: functionError } = await supabase
+          .rpc('create_company_notification', {
+            p_student_id: applicationData.student_id,
+            p_application_id: applicationId,
+            p_type: 'offer',
+            p_title: '¡Tienes una oferta! 🎉',
+            p_body: `${companyName} te ha enviado una oferta para: "${vacancyTitle}"`,
+            p_action_url: '/alumno/ofertas'
+          });
+
+        if (functionError) {
+          console.error("Error llamando a función de notificación:", functionError);
+          throw functionError;
+        }
+        
+        console.log("Notificación de oferta creada exitosamente. ID:", notificationId);
+      } else {
+        console.error("No se pudieron obtener los datos completos de la aplicación");
+      }
 
     } catch (error) {
       console.error("Error en createOfferNotification:", error);
     }
   };
-
 
   const handleSendOffer = (applicationId) => {
     if (confirm("¿Enviar oferta a este alumno?")) {
@@ -406,7 +409,7 @@ const createOfferNotification = async (applicationId) => {
 
         <div className="profile-container">
 
-          {/* Filtros */}
+          {/* Filtros - VERSIÓN ACTUALIZADA 👇 */}
           <section className="panel-card" style={{ marginBottom: 20 }}>
             <h3 style={{ margin: '0 0 15px 0', fontSize: 16 }}>Filtros</h3>
             <div style={{ display: 'flex', gap: 15, flexWrap: 'wrap' }}>
@@ -449,9 +452,13 @@ const createOfferNotification = async (applicationId) => {
                     minWidth: 180
                   }}
                 >
-                  <option value="all">Todos los estados</option>
+                  <option value="activas">Solo activas</option>
+                  <option value="all">Todas las postulaciones</option>
                   <option value="postulada">Pendiente</option>
                   <option value="oferta">Oferta</option>
+                  <option value="aceptada">Práctica activa</option>
+                  <option value="completada">Práctica completada</option>
+                  <option value="finalizada">Práctica finalizada</option>
                   <option value="rechazada">Rechazada</option>
                 </select>
               </div>
@@ -461,7 +468,7 @@ const createOfferNotification = async (applicationId) => {
                   className="btn btn-ghost"
                   onClick={() => {
                     setSelectedVacancy("all");
-                    setSelectedStatus("all");
+                    setSelectedStatus("activas"); // 👈 Reset a "activas"
                   }}
                 >
                   Limpiar filtros
@@ -490,7 +497,6 @@ const createOfferNotification = async (applicationId) => {
                   className={`jobs-card ${selectedApp?.id === app.id ? "is-active" : ""}`}
                   onClick={() => {
                     if (isMobile()) {
-                      // Para móvil podrías redirigir a una página de detalle
                       console.log("App seleccionada:", app.id);
                     } else {
                       setSelectedApp(app);
@@ -620,7 +626,7 @@ const createOfferNotification = async (applicationId) => {
                     </section>
                   )}
 
-                  {/* UI: Acciones según estado */}
+                  {/* UI: Acciones según estado - VERSIÓN ACTUALIZADA 👇 */}
                   <section className="jobs-section">
                     <h3>Gestionar Postulación</h3>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -640,10 +646,16 @@ const createOfferNotification = async (applicationId) => {
                           </button>
                         </>
                       ) : selectedApp.status === 'oferta' ? (
-                        <Badge text="Oferta enviada" tone="info" />
+                        <Badge text="Oferta enviada - Esperando respuesta" tone="info" />
+                      ) : selectedApp.status === 'aceptada' ? (
+                        <Badge text="✅ Práctica en curso" tone="success" />
+                      ) : selectedApp.status === 'completada' || selectedApp.status === 'finalizada' ? (
+                        <Badge text="🏁 Práctica finalizada" tone="muted" />
                       ) : selectedApp.status === 'rechazada' ? (
                         <Badge text="Postulación rechazada" tone="error" />
-                      ) : null}
+                      ) : (
+                        <Badge text={getStatusText(selectedApp.status)} tone={getStatusBadgeTone(selectedApp.status)} />
+                      )}
                     </div>
                   </section>
                 </div>

@@ -1,4 +1,3 @@
-// pages/alumno/vacante/[id].js
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/router";
 import Navbar from "../../../components/navbar";
@@ -6,7 +5,7 @@ import Footer from "../../../components/footer";
 import { supabase } from "../../../lib/supabaseClient";
 import { useActivePractice } from '../../../components/hooks/useActivePractice';
 
-/* --- helpers UI<->BD para mostrar bonito --- */
+/* --- helpers UI --- */
 const MAP_DB_TO_UI = {
   modalidad: { presencial: "Presencial", "híbrido": "Híbrida", remoto: "Remota" },
   comp: { apoyo_economico: "Apoyo económico", sin_apoyo: "Sin apoyo" },
@@ -115,7 +114,7 @@ export default function VacanteDetallePage() {
   const [hasCompletedPracticeForThisVacancy, setHasCompletedPracticeForThisVacancy] = useState(false);
   const [applicationStatus, setApplicationStatus] = useState(null);
 
-  // Obtener usuario y aplicaciones - COMPLETAMENTE CORREGIDO
+  // Obtener usuario y aplicaciones
   useEffect(() => {
     const boot = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -124,7 +123,7 @@ export default function VacanteDetallePage() {
 
         console.log("🔍 Iniciando carga de estados para usuario:", user.id, "vacante:", id);
 
-        // 1. Primero verificar si está participando en ESTA vacante específica
+        // Primero verificar si está participando en ESTA vacante específica
         const { data: activePractice } = await supabase
           .from("practices")
           .select("vacancy_id")
@@ -144,7 +143,7 @@ export default function VacanteDetallePage() {
           setIsParticipatingInThisVacancy(false);
         }
 
-        // 2. Cargar TODAS las aplicaciones del usuario para esta vacante
+        // Cargar TODAS las aplicaciones del usuario para esta vacante
         const { data: appsData } = await supabase
           .from("applications")
           .select("id, vacancy_id, status")
@@ -158,19 +157,19 @@ export default function VacanteDetallePage() {
           const allAppliedIds = [...new Set(appsData.map(a => a.vacancy_id))];
           setAppliedVacancyIds(allAppliedIds);
 
-          // 3. Buscar oferta específica para esta vacante
+          // Buscar oferta específica para esta vacante
           const offerForThis = appsData.find(app => app.status === 'oferta');
           console.log("🎉 Oferta encontrada para esta vacante:", !!offerForThis, offerForThis);
           setHasOfferForThisVacancy(!!offerForThis);
 
-          // 4. Buscar prácticas completadas para esta vacante
+          // Buscar prácticas completadas para esta vacante
           const completedPractice = appsData.find(app => 
             app.status === 'completada' || app.status === 'finalizada'
           );
           console.log("🔄 Práctica completada encontrada:", !!completedPractice);
           setHasCompletedPracticeForThisVacancy(!!completedPractice);
 
-          // 5. Guardar el estado actual de la aplicación
+          // Guardar el estado actual de la aplicación
           const currentApp = appsData.find(app => 
             ['postulada', 'en_proceso', 'oferta'].includes(app.status)
           );
@@ -263,7 +262,7 @@ export default function VacanteDetallePage() {
       if (!userId) { router.push("/login"); return; }
       if (!vacancy?.id) return;
       
-      // VERIFICACIÓN CORREGIDA: Solo bloquear si tiene práctica activa PERO NO en esta vacante
+      // Solo bloquear si tiene práctica activa PERO NO en esta vacante
       if (hasActivePractice && !isParticipatingInThisVacancy) {
         alert("Ya tienes un proyecto activo. No puedes postularte a otras vacantes.");
         return;
@@ -349,7 +348,7 @@ export default function VacanteDetallePage() {
     );
   }
 
-  // Determinar el texto del botón - COMPLETAMENTE REESCRITO
+  // Determinar el texto del botón
   const getApplyButtonState = () => {
     console.log("🎯 Calculando estado del botón:", {
       isParticipatingInThisVacancy,
@@ -360,7 +359,7 @@ export default function VacanteDetallePage() {
       applicationStatus
     });
 
-    // 1. PRIORIDAD MÁXIMA: Ya está participando en ESTA vacante
+    // PRIORIDAD MÁXIMA: Ya está participando en ESTA vacante
     if (isParticipatingInThisVacancy) {
       return { 
         text: "✅ Ya estás participando en este proyecto", 
@@ -370,7 +369,7 @@ export default function VacanteDetallePage() {
       };
     }
     
-    // 2. Tiene oferta para ESTA vacante
+    // Tiene oferta para ESTA vacante
     if (hasOfferForThisVacancy) {
       return { 
         text: "🎉 ¡Tienes una oferta!", 
@@ -380,7 +379,7 @@ export default function VacanteDetallePage() {
       };
     }
     
-    // 3. Tiene práctica activa en OTRA vacante
+    // Tiene práctica activa en OTRA vacante
     if (hasActivePractice && !isParticipatingInThisVacancy) {
       return { 
         text: "⏸️ Ya tienes un proyecto activo", 
@@ -390,7 +389,7 @@ export default function VacanteDetallePage() {
       };
     }
     
-    // 4. Ya postulada (estados normales: postulada o en_proceso)
+    // Ya postulada (estados normales: postulada o en_proceso)
     if (applicationStatus && ['postulada', 'en_proceso'].includes(applicationStatus)) {
       return { 
         text: "✅ Ya postulada", 
@@ -400,7 +399,7 @@ export default function VacanteDetallePage() {
       };
     }
     
-    // 5. Cupos agotados
+    // Cupos agotados
     if (vacancy?.spots_left <= 0) {
       return { 
         text: "❌ Cupos agotados", 
@@ -410,7 +409,7 @@ export default function VacanteDetallePage() {
       };
     }
     
-    // 6. Práctica completada anteriormente - puede postularse nuevamente
+    // Práctica completada anteriormente - puede postularse nuevamente
     if (hasCompletedPracticeForThisVacancy) {
       return { 
         text: applyLoading ? "Enviando..." : "🔄 Postularse nuevamente", 
@@ -420,7 +419,7 @@ export default function VacanteDetallePage() {
       };
     }
     
-    // 7. Postulación normal
+    // Postulación normal
     return { 
       text: applyLoading ? "Enviando..." : "📝 Postularse ahora", 
       disabled: applyLoading, 
@@ -431,7 +430,7 @@ export default function VacanteDetallePage() {
 
   const buttonState = getApplyButtonState();
 
-  // DEBUG: Mostrar estados actuales
+  // DEBUG: Mostrar estados actuales AYUDA
   console.log("🔍 ESTADOS FINALES:", {
     vacancyId: id,
     isParticipatingInThisVacancy,
@@ -474,9 +473,9 @@ export default function VacanteDetallePage() {
                   </div>
                 </header>
 
-                {/* Mensajes de estado - CORREGIDO */}
+                {/* Mensajes de estado */}
                 
-                {/* 1. Participando en ESTA vacante */}
+                {/* Participando en ESTA vacante */}
                 {buttonState.type === "practicing" && (
                   <div style={{
                     background: "#f0f9ff",
@@ -502,7 +501,7 @@ export default function VacanteDetallePage() {
                   </div>
                 )}
 
-                {/* 2. Tiene oferta para ESTA vacante */}
+                {/* Tiene oferta para ESTA vacante */}
                 {buttonState.type === "offer" && (
                   <div style={{
                     background: "#fffbeb",
@@ -528,7 +527,7 @@ export default function VacanteDetallePage() {
                   </div>
                 )}
 
-                {/* 3. Tiene práctica activa en OTRA vacante */}
+                {/* Tiene práctica activa en OTRA vacante */}
                 {buttonState.type === "active_other" && (
                   <div style={{
                     background: "#fef2f2",
@@ -554,7 +553,7 @@ export default function VacanteDetallePage() {
                   </div>
                 )}
 
-                {/* 4. Práctica completada anteriormente */}
+                {/* Práctica completada anteriormente */}
                 {buttonState.type === "completed_retry" && (
                   <div style={{
                     background: "#f0fdf4",
@@ -580,7 +579,7 @@ export default function VacanteDetallePage() {
                   </div>
                 )}
 
-                {/* 5. Ya postulada normalmente */}
+                {/* Ya postulada normalmente */}
                 {buttonState.type === "applied" && (
                   <div style={{
                     background: "#f0f9ff",

@@ -1,4 +1,3 @@
-// pages/alumno/ofertas.js
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
@@ -88,7 +87,7 @@ export default function OfertasPage() {
   const { hasActivePractice, loading: practiceLoading } = useActivePractice();
 
   // UI: estado principal
-  const [offers, setOffers] = useState([]); // [{appId, applied_at, status, ...vacancy}]
+  const [offers, setOffers] = useState([]);
   const [selected, setSelected] = useState(null);
 
   const isMobile = () =>
@@ -164,36 +163,42 @@ const acceptOffer = async (appId) => {
   if (!ok) return;
   
   try {
-    // 1. EJECUTAR student_accept_offer ORIGINAL (esto notifica al profesor)
-    const { error } = await supabase.rpc("student_accept_offer", { p_app_id: appId });
-    if (error) throw error;
-    
-    // 2. Notificación simple a la empresa (con la política RLS corregida)
-    const { data: offerData } = await supabase
+    // obtener información completa para las notificaciones
+    const { data: offerData, error: queryError } = await supabase
       .from("applications")
       .select(`
-        student:students!applications_student_id_fkey (full_name),
-        vacancy:vacancies (title, company:companies(owner_id))
+        id,
+        student_id,
+        student:profiles!applications_student_id_fkey (full_name, email),
+        vacancy:vacancies (
+          id, 
+          title, 
+          company:companies!vacancies_company_id_fkey (
+            id, 
+            name, 
+            owner_id,
+            email
+          )
+        )
       `)
       .eq("id", appId)
       .single();
 
-    if (offerData?.vacancy?.company?.owner_id) {
-      await supabase
-        .from("notifications")
-        .insert({
-          student_id: offerData.vacancy.company.owner_id,
-          type: "info",
-          title: "Oferta aceptada", 
-          body: `El alumno ${offerData.student.full_name} ha aceptado tu oferta para "${offerData.vacancy.title}".`,
-          action_url: `/empresa/postulaciones`
-        });
-    }
+    if (queryError) throw queryError;
+    if (!offerData) throw new Error("No se pudo obtener la información de la oferta");
+
+    const { student, student_id, vacancy } = offerData;
+    const company = vacancy?.company;
+
+    // EJECUTAR student_accept_offer (esto notifica al profesor) CON EL TRIGGER NO OLVIDAR
+    const { error: acceptError } = await supabase.rpc("student_accept_offer", { p_app_id: appId });
+    if (acceptError) throw acceptError;
     
+    // Disparar evento para actualizar estado de práctica
     window.dispatchEvent(new CustomEvent('practiceStatusChanged'));
     router.push("/alumno/mis-practicas");
   } catch (e) {
-    console.error(e);
+    console.error("Error aceptando oferta:", e);
     alert(e.message || "No se pudo aceptar la oferta.");
   }
 };
@@ -220,7 +225,6 @@ const acceptOffer = async (appId) => {
   const list = useMemo(() => offers, [offers]);
 
   /* ---------- Helpers UI ---------- */
-  // Prioriza la dirección de la vacante; si no existe, usa la de la empresa
   const mapAddress = selected?.location_text || selected?.company?.location_text || "";
 
   // Mostrar loading mientras se verifica el estado de práctica
@@ -374,7 +378,7 @@ const acceptOffer = async (appId) => {
                   <button
                     className="jobs-apply"
                     onClick={() => acceptOffer(selected.appId)}
-                    disabled={hasActivePractice} // USAR EL VALOR DEL HOOK
+                    disabled={hasActivePractice} // EL HOOK LEVANTANDO EL EVENTO, PERO QUIÉN ME LEVANTA A MÍ
                     title={hasActivePractice ? "Ya tienes una práctica activa" : "Aceptar oferta"}
                   >
                     Aceptar oferta
@@ -393,7 +397,7 @@ const acceptOffer = async (appId) => {
         </section>
       </main>
 
-      {/* UI: responsive */}
+      {/* UI: responsive NOTA: PASAR AL CSS PORQUE YA NO TENGO CEREBRO GRACIAS*/}
       <style jsx global>{`
         @media (max-width: 899px) {
           .jobs-grid { grid-template-columns: 1fr !important; }

@@ -215,17 +215,19 @@ export default function EstudiantesPage() {
   const PAGE_SIZE = 20;
   const [hasMore, setHasMore] = useState(true);
 
-  // usuario y flags
+  // usuario y flags 
   const [userId, setUserId] = useState(null);
   const [studentProgramId, setStudentProgramId] = useState(null);
   const [favIds, setFavIds] = useState([]);
   const [hiddenIds, setHiddenIds] = useState([]);
   
-  // ✅ CORREGIDO: Separar claramente aplicaciones por estado
-  const [applicationStatuses, setApplicationStatuses] = useState({}); // { vacancyId: status }
+  // Estados separados y específicos
+  const [applicationStatuses, setApplicationStatuses] = useState({});
   const [completedVacancyIds, setCompletedVacancyIds] = useState([]);
+  const [offerVacancyIds, setOfferVacancyIds] = useState([]);
+  const [participatingVacancyIds, setParticipatingVacancyIds] = useState([]);
 
-  /* ---------- BD: boot ---------- */
+  /* ---------- BD: boot - COMPLETAMENTE CORREGIDO ---------- */
   useEffect(() => {
     let ignore = false;
     const boot = async () => {
@@ -244,36 +246,60 @@ export default function EstudiantesPage() {
         console.log("🎯 Programa del estudiante:", profile?.program_id);
       }
 
-      // Cargar favoritos, ocultas y aplicaciones
-      const [{ data: favData }, { data: hidData }, { data: appsData }] = await Promise.all([
+      // Cargar TODOS los datos necesarios
+      const [
+        { data: favData }, 
+        { data: hidData }, 
+        { data: appsData },
+        { data: practicesData }
+      ] = await Promise.all([
         supabase.from("vacancy_favorites").select("vacancy_id").eq("student_id", user.id).limit(500),
         supabase.from("vacancy_hidden").select("vacancy_id").eq("student_id", user.id).limit(500),
         supabase.from("applications").select("vacancy_id, status").eq("student_id", user.id).limit(1000),
+        supabase.from("practices").select("vacancy_id, status").eq("student_id", user.id).limit(100)
       ]);
 
       if (!ignore && favData) setFavIds(favData.map((x) => x.vacancy_id));
       if (!ignore && hidData) setHiddenIds(hidData.map((x) => x.vacancy_id));
       
-      if (!ignore && appsData) {
+      if (!ignore) {
         console.log("📊 Todas las aplicaciones cargadas:", appsData);
+        console.log("🏆 Prácticas cargadas:", practicesData);
         
-        // ✅ CORREGIDO: Crear mapa de estados por vacante
+        // Separar correctamente todos los estados
         const statusMap = {};
         const completedIds = [];
-        
-        appsData.forEach(app => {
-          statusMap[app.vacancy_id] = app.status;
-          
-          if (['completada', 'terminada', 'finalizada'].includes(app.status)) {
-            completedIds.push(app.vacancy_id);
-          }
-        });
-        
-        console.log("🗺️ Mapa de estados de aplicación:", statusMap);
-        console.log("✅ Vacantes completadas:", completedIds);
+        const offerIds = [];
+        const participatingIds = [];
+
+        // Procesar aplicaciones
+        if (appsData) {
+          appsData.forEach(app => {
+            statusMap[app.vacancy_id] = app.status;
+            
+            if (['completada', 'terminada', 'finalizada'].includes(app.status)) {
+              completedIds.push(app.vacancy_id);
+            }
+            
+            if (app.status === 'oferta') {
+              offerIds.push(app.vacancy_id);
+            }
+          });
+        }
+
+        // Procesar prácticas activas
+        if (practicesData) {
+          practicesData.forEach(practice => {
+            if (practice.status === 'active') {
+              participatingIds.push(practice.vacancy_id);
+            }
+          });
+        }
         
         setApplicationStatuses(statusMap);
         setCompletedVacancyIds(completedIds);
+        setOfferVacancyIds(offerIds);
+        setParticipatingVacancyIds(participatingIds);
       }
     };
     boot();
@@ -287,7 +313,7 @@ export default function EstudiantesPage() {
       setLoading(true);
       setErrorMsg("");
 
-      // ✅ CORREGIDO: Si no hay studentProgramId, mostrar vacantes sin filtrar por programa
+      // Si no hay studentProgramId, mostrar vacantes sin filtrar por programa
       if (!studentProgramId) {
         console.log("⚠️ No hay programa asignado, mostrando todas las vacantes");
         let query = supabase
@@ -497,12 +523,21 @@ export default function EstudiantesPage() {
       if (!userId) { router.push("/login"); return; }
       if (!vacancy?.id) return;
       
-      if (hasActivePractice) {
-        alert("Ya tienes una práctica activa. No puedes postularte a otras vacantes.");
+      // Verificar participación activa en ESTA vacante específica
+      const isParticipatingInThis = participatingVacancyIds.includes(vacancy.id);
+      if (hasActivePractice && !isParticipatingInThis) {
+        alert("Ya tienes un proyecto activo. No puedes postularte a otras vacantes.");
         return;
       }
 
-      // ✅ CORREGIDO: Verificar si ya tiene aplicación activa (incluyendo oferta)
+      // Verificar si ya tiene oferta activa
+      if (offerVacancyIds.includes(vacancy.id)) {
+        alert("Ya tienes una oferta para esta vacante. Ve a la sección de ofertas para gestionarla.");
+        router.push('/alumno/ofertas');
+        return;
+      }
+
+      // Verificar si ya tiene una aplicación ACTIVA (no completada) para esta vacante
       const currentStatus = applicationStatuses[vacancy.id];
       if (currentStatus && ['postulada', 'en_revision', 'oferta', 'aceptada'].includes(currentStatus)) {
         alert("Ya te has postulado a esta vacante.");
@@ -530,9 +565,10 @@ export default function EstudiantesPage() {
         throw error;
       }
 
-      // Éxito: marca como postulada en UI
+      // Marca como postulada en UI
       setApplicationStatuses(prev => ({ ...prev, [vacancy.id]: 'postulada' }));
-      setCompletedVacancyIds(prev => prev.filter(id => id !== vacancy.id)); // Remover de completadas
+      setCompletedVacancyIds(prev => prev.filter(id => id !== vacancy.id));
+      setOfferVacancyIds(prev => prev.filter(id => id !== vacancy.id));
       alert("¡Listo! Tu postulación fue enviada.");
     } catch (e) {
       console.error(e);
@@ -540,17 +576,43 @@ export default function EstudiantesPage() {
     }
   };
 
-  // Determinar el texto y estado del botón de postulación - COMPLETAMENTE REESCRITO
+  // Función completamente reescrita para determinar el estado del botón
   const getApplyButtonState = (vacancyId) => {
     const currentStatus = applicationStatuses[vacancyId];
+    const isParticipatingInThis = participatingVacancyIds.includes(vacancyId);
+    const hasOfferForThis = offerVacancyIds.includes(vacancyId);
+    const hasCompletedThis = completedVacancyIds.includes(vacancyId);
     
     console.log("🎯 Estado del botón para vacante", vacancyId, ":", {
       currentStatus,
       hasActivePractice,
-      isCompleted: completedVacancyIds.includes(vacancyId)
+      isParticipatingInThis,
+      hasOfferForThis,
+      hasCompletedThis
     });
 
-    if (hasActivePractice) {
+    // Participando activamente en ESTA vacante
+    if (isParticipatingInThis) {
+      return { 
+        text: "✅ Ya estás participando", 
+        disabled: false,
+        type: "practicing",
+        action: () => router.push('/alumno/mis-practicas')
+      };
+    }
+    
+    // Tiene oferta para ESTA vacante
+    if (hasOfferForThis) {
+      return { 
+        text: "🎉 ¡Tienes una oferta!", 
+        disabled: false,
+        type: "offer",
+        action: () => router.push('/alumno/ofertas')
+      };
+    }
+    
+    // Tiene práctica activa en OTRA vacante
+    if (hasActivePractice && !isParticipatingInThis) {
       return { 
         text: "Práctica Activa", 
         disabled: true,
@@ -558,16 +620,7 @@ export default function EstudiantesPage() {
       };
     } 
     
-    // ✅ CORREGIDO: Detectar oferta específicamente
-    else if (currentStatus === 'oferta') {
-      return { 
-        text: "🎉 ¡Tienes una oferta!", 
-        disabled: false,
-        type: "offer",
-        action: () => router.push('/alumno/ofertas')
-      };
-    } 
-    
+    // Ya postulada normalmente
     else if (currentStatus && ['postulada', 'en_revision', 'aceptada'].includes(currentStatus)) {
       return { 
         text: "Ya postulada", 
@@ -576,7 +629,8 @@ export default function EstudiantesPage() {
       };
     } 
     
-    else if (completedVacancyIds.includes(vacancyId)) {
+    // Práctica completada anteriormente
+    else if (hasCompletedThis) {
       return { 
         text: "Postularse nuevamente", 
         disabled: false,
@@ -584,6 +638,7 @@ export default function EstudiantesPage() {
       };
     } 
     
+    // Postulación normal
     else {
       return { 
         text: "Postularse ahora", 
@@ -593,29 +648,39 @@ export default function EstudiantesPage() {
     }
   };
 
-  // Obtener texto descriptivo del estado para mostrar en la tarjeta
+  // Función para obtener texto del estado
   const getStatusText = (vacancyId) => {
     const currentStatus = applicationStatuses[vacancyId];
+    const isParticipatingInThis = participatingVacancyIds.includes(vacancyId);
+    const hasOfferForThis = offerVacancyIds.includes(vacancyId);
+    const hasCompletedThis = completedVacancyIds.includes(vacancyId);
     
+    // Participación activa primero
+    if (isParticipatingInThis) return "✅ Participando activamente";
+    if (hasOfferForThis) return "🎉 ¡Tienes una oferta!";
     if (hasActivePractice) return "Práctica activa";
-    if (currentStatus === 'oferta') return "🎉 ¡Tienes una oferta!";
     if (currentStatus === 'postulada') return "Postulación enviada";
     if (currentStatus === 'en_revision') return "En revisión por la empresa";
     if (currentStatus === 'aceptada') return "Oferta aceptada";
-    if (completedVacancyIds.includes(vacancyId)) return "Práctica completada anteriormente";
+    if (hasCompletedThis) return "Práctica completada anteriormente";
     return "Disponible para postularse";
   };
 
-  // Obtener color del estado para la tarjeta
+  // Función para obtener color del estado
   const getStatusColor = (vacancyId) => {
     const currentStatus = applicationStatuses[vacancyId];
+    const isParticipatingInThis = participatingVacancyIds.includes(vacancyId);
+    const hasOfferForThis = offerVacancyIds.includes(vacancyId);
+    const hasCompletedThis = completedVacancyIds.includes(vacancyId);
     
+    // Participación activa primero
+    if (isParticipatingInThis) return "#059669";
+    if (hasOfferForThis) return "#d97706";
     if (hasActivePractice) return "#dc2626";
-    if (currentStatus === 'oferta') return "#d97706";
     if (currentStatus === 'postulada') return "#059669";
     if (currentStatus === 'en_revision') return "#7c3aed";
     if (currentStatus === 'aceptada') return "#059669";
-    if (completedVacancyIds.includes(vacancyId)) return "#f59e0b";
+    if (hasCompletedThis) return "#f59e0b";
     return "#6b7280";
   };
 
@@ -729,6 +794,8 @@ export default function EstudiantesPage() {
               const buttonState = getApplyButtonState(v.id);
               const statusText = getStatusText(v.id);
               const statusColor = getStatusColor(v.id);
+              const isParticipatingInThis = participatingVacancyIds.includes(v.id);
+              const hasOfferForThis = offerVacancyIds.includes(v.id);
               
               return (
                 <button
@@ -845,13 +912,13 @@ export default function EstudiantesPage() {
                   </div>
                 </header>
 
-                {/* Mensaje de oferta activa */}
-                {applicationStatuses[selected.id] === 'oferta' && (
+                {/* Participando en ESTA vacante */}
+                {participatingVacancyIds.includes(selected.id) && (
                   <div style={{
-                    background: "#fffbeb",
-                    border: "1px solid #f59e0b",
+                    background: "#f0f9ff",
+                    border: "1px solid #0ea5e9",
                     borderRadius: "8px",
-                    padding: "12px",
+                    padding: "16px",
                     marginBottom: "16px",
                     textAlign: "center"
                   }}>
@@ -860,26 +927,24 @@ export default function EstudiantesPage() {
                       alignItems: "center", 
                       justifyContent: "center",
                       gap: "8px",
-                      marginBottom: "4px"
+                      marginBottom: "8px"
                     }}>
-                      <span style={{ fontSize: "20px" }}>🎉</span>
-                      <strong style={{ color: "#d97706", fontSize: "14px" }}>
-                        ¡Tienes una oferta de esta vacante!
-                      </strong>
+                      <span style={{ fontSize: "24px" }}>✅</span>
+                      <strong style={{ color: "#0369a1" }}>¡Ya estás participando en esta vacante!</strong>
                     </div>
-                    <p style={{ margin: 0, color: "#92400e", fontSize: "12px" }}>
-                      Ve a la sección de ofertas para aceptar o rechazar esta propuesta
+                    <p style={{ margin: 0, color: "#075985", fontSize: "14px" }}>
+                      Esta es tu práctica actual. No olvides mantener contacto con la empresa para conocer más detalles del proyecto.
                     </p>
                   </div>
                 )}
 
-                {/* Mensaje de práctica completada anteriormente */}
-                {completedVacancyIds.includes(selected.id) && (
+                {/* Tiene oferta para ESTA vacante */}
+                {offerVacancyIds.includes(selected.id) && (
                   <div style={{
-                    background: "#f0fdf4",
-                    border: "1px solid #bbf7d0",
+                    background: "#fffbeb",
+                    border: "1px solid #f59e0b",
                     borderRadius: "8px",
-                    padding: "12px",
+                    padding: "16px",
                     marginBottom: "16px",
                     textAlign: "center"
                   }}>
@@ -888,15 +953,39 @@ export default function EstudiantesPage() {
                       alignItems: "center", 
                       justifyContent: "center",
                       gap: "8px",
-                      marginBottom: "4px"
+                      marginBottom: "8px"
                     }}>
-                      <span style={{ fontSize: "20px" }}>🔄</span>
-                      <strong style={{ color: "#166534", fontSize: "14px" }}>
-                        Ya completaste una práctica aquí anteriormente
-                      </strong>
+                      <span style={{ fontSize: "24px" }}>🎉</span>
+                      <strong style={{ color: "#d97706" }}>¡Tienes una oferta de esta vacante!</strong>
                     </div>
-                    <p style={{ margin: 0, color: "#166534", fontSize: "12px" }}>
-                      Puedes postularte nuevamente a esta vacante
+                    <p style={{ margin: 0, color: "#92400e", fontSize: "14px" }}>
+                      Ve a la sección de ofertas para aceptar o rechazar esta propuesta.
+                    </p>
+                  </div>
+                )}
+
+                {/* Práctica completada anteriormente */}
+                {completedVacancyIds.includes(selected.id) && !offerVacancyIds.includes(selected.id) && !participatingVacancyIds.includes(selected.id) && (
+                  <div style={{
+                    background: "#f0fdf4",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: "8px",
+                    padding: "16px",
+                    marginBottom: "16px",
+                    textAlign: "center"
+                  }}>
+                    <div style={{ 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "center",
+                      gap: "8px",
+                      marginBottom: "8px"
+                    }}>
+                      <span style={{ fontSize: "24px" }}>🔄</span>
+                      <strong style={{ color: "#166534" }}>Ya completaste una práctica aquí anteriormente</strong>
+                    </div>
+                    <p style={{ margin: 0, color: "#166534", fontSize: "14px" }}>
+                      Puedes postularte nuevamente a esta vacante.
                     </p>
                   </div>
                 )}
@@ -952,9 +1041,11 @@ export default function EstudiantesPage() {
                         title={hasActivePractice ? "Ya tienes una práctica activa" : ""}
                         style={{
                           background: 
+                            buttonState.type === "practicing" ? "#0ea5e9" :
                             buttonState.type === "offer" ? "#f59e0b" :
+                            buttonState.type === "active_practice" ? "#f3f4f6" : 
                             buttonState.type === "completed_retry" ? "#f59e0b" : 
-                            buttonState.type === "active_practice" ? "#f3f4f6" : "#2563eb",
+                            buttonState.type === "applied" ? "#0ea5e9" : "#2563eb",
                           color: buttonState.type === "active_practice" ? "#6b7280" : "#fff"
                         }}
                       >

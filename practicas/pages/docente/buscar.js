@@ -1,4 +1,3 @@
-// pages/profesores/buscar.js
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
