@@ -195,9 +195,7 @@ export default function NuevaVacantePage() {
           {/* Header */}
           <div className="nueva-vacante-header">
             <h1 className="nueva-vacante-title">Nueva vacante</h1>
-            <p className="nueva-vacante-subtitle">
-              Completa la información para publicar la vacante
-            </p>
+            
           </div>
 
           {err && (
@@ -207,19 +205,24 @@ export default function NuevaVacantePage() {
           )}
 
           {/* Información general */}
-          <div className="nueva-vacante-card">
-            <h3 className="nueva-vacante-card-title">
-              Información general
+          <div className="empresa-edit-field">
+            <h3 className="jobs-title">
+              Información general <br></br>
             </h3>
+            <p className="jobs-muted small">
+              Completa la información para publicar la vacante
+            </p>
             
-            <div className="nueva-vacante-grid">
+            <div className="empresa-edit-section">
               {/* Título */}
               <div className="nueva-vacante-field">
                 <label className="nueva-vacante-label">
-                  Título del puesto *
+                  <span class="lbl"><br></br>Título del puesto <br></br> </span>
                 </label>
+                
                 <input
-                  className="nueva-vacante-input"
+                style={{ width:"100%" }}
+                  className="login-input"
                   type="text"
                   value={form.title}
                   onChange={handleInputChange('title')}
@@ -230,25 +233,26 @@ export default function NuevaVacantePage() {
 
               {/* Ubicación */}
               <div className="nueva-vacante-field">
-                <label className="nueva-vacante-label">
-                  Ubicación
+                <label className="nueva-vacante-label" >
+                  <span class="lbl"><br></br>Ubicación<br></br> </span>
                 </label>
                 <input
-                  className="nueva-vacante-input"
+                style={{ width:"100%" }}
+                  className="login-input"
                   type="text"
                   value={form.location_text}
                   onChange={handleInputChange('location_text')}
                   placeholder="Ej: Ciudad Juárez, Chihuahua"
+    
                 />
               </div>
 
+              <div className="jobs-filters" style={{ display:"grid", gap:10, gridTemplateColumns:"1fr 1fr 1fr" }}>
+
               {/* Modalidad */}
-              <div className="nueva-vacante-field">
-                <label className="nueva-vacante-label">
-                  Modalidad
-                </label>
+              <div className="jobs-pill">
+                <span className="lbl" style={{ fontSize:16 }}>Modalidad</span>
                 <select 
-                  className="nueva-vacante-input"
                   value={form.modality} 
                   onChange={handleSelectChange('modality')}
                 >
@@ -259,12 +263,9 @@ export default function NuevaVacantePage() {
               </div>
 
               {/* Compensación */}
-              <div className="nueva-vacante-field">
-                <label className="nueva-vacante-label">
-                  Compensación
-                </label>
+              <div className="jobs-pill">
+                <span className="lbl" style={{ fontSize:16 }} >Compensación</span>
                 <select 
-                  className="nueva-vacante-input"
                   value={form.compensation} 
                   onChange={handleSelectChange('compensation')}
                 >
@@ -274,10 +275,8 @@ export default function NuevaVacantePage() {
               </div>
 
               {/* Idioma */}
-              <div className="nueva-vacante-field">
-                <label className="nueva-vacante-label">
-                  Idioma
-                </label>
+              <div className="jobs-pill">
+                <span className="lbl" style={{ fontSize:16 }}>Idioma</span>
                 <select 
                   className="nueva-vacante-input"
                   value={form.language} 
@@ -288,25 +287,26 @@ export default function NuevaVacantePage() {
                 </select>
               </div>
 
+              </div>
+
+              <div style={{ display:"grid", gap:10, gridTemplateColumns:"1fr 1fr" }}>
+
               {/* Cupo total */}
-              <div className="nueva-vacante-field">
-                <label className="nueva-vacante-label">
-                  Cupo total
-                </label>
+              <div className="jobs-pill">
+                <span className="lbl" style={{ fontSize:16 }}>Cupo total</span>
                 <input
-                  className="nueva-vacante-input"
+                  className="login-input"
                   type="number"
                   min="1"
                   value={form.spots_total}
                   onChange={handleSelectChange('spots_total')}
+                  style={{ width:"90px" }}
                 />
               </div>
 
               {/* Estado */}
-              <div className="nueva-vacante-field">
-                <label className="nueva-vacante-label">
-                  Estado
-                </label>
+              <div className="jobs-pill">
+                <span className="lbl" style={{ fontSize:16 }}>Estado</span>
                 <select 
                   className="nueva-vacante-input"
                   value={form.status} 
@@ -319,25 +319,26 @@ export default function NuevaVacantePage() {
             </div>
           </div>
 
+          </div>
+
           {/* Programas */}
-          <div className="nueva-vacante-card">
-            <h3 className="nueva-vacante-card-title">
-              Programas académicos
-            </h3>
+          <label className="jobs-pill" style={{ gap:8, alignItems:"flex-start" }}>
             
-            <div className="nueva-vacante-programs-list">
+            <div style={{ display:"grid", gap:6 }}>
+              <span className="lbl" style={{ fontSize:16 }}>Programas</span>
               {programs.length > 0 ? (
                 programs.map(program => (
                   <label 
+                  style={{ display:"flex", alignItems:"center", gap:8 }}
                     key={program.id}
-                    className="nueva-vacante-program-item"
+                    className="empresa-program-checkbox"
                   >
                     <input
                       type="checkbox"
-                      checked={programIds.includes(program.id)}
+                      checked={programIds.includes(program.id )}
                       onChange={() => handleProgramToggle(program.id)}
                     />
-                    <span className="nueva-vacante-program-label">
+                    <span>
                       <strong>{program.key}</strong> — {program.name}
                     </span>
                   </label>
@@ -348,48 +349,49 @@ export default function NuevaVacantePage() {
                 </div>
               )}
             </div>
-          </div>
+          </label>
 
           {/* Actividades */}
-          <div className="nueva-vacante-card">
-            <h3 className="nueva-vacante-card-title">
-              Actividades
+          <h3>
+              
             </h3>
             <textarea
-              className="nueva-vacante-textarea"
+            style={{ width:"100%" }}
+              className="login-input"
               value={form.activities}
               onChange={handleInputChange('activities')}
-              placeholder="Describe las actividades que realizará el practicante..."
-              rows={5}
+              placeholder="Actividades. Describe las actividades que realizará el practicante..."
+              rows={4}
             />
-          </div>
+          
 
           {/* Requisitos */}
-          <div className="nueva-vacante-card">
-            <h3 className="nueva-vacante-card-title">
-              Requisitos
+          <h3>
+              <br></br>
             </h3>
+      
             <textarea
-              className="nueva-vacante-textarea"
+            style={{ width:"100%" }}
+            className="login-input"
               value={form.requirements}
-              onChange={handleInputChange('requirements')}
-              placeholder="Lista los requisitos necesarios para esta vacante..."
-              rows={5}
+              onChange={(e) => setEditForm(prev => ({ ...prev, activities: e.target.value }))}
+              rows={4}
+              placeholder="Requisitos. Lista los requisitos necesarios para esta vacante..."
             />
-          </div>
 
           {/* Acciones */}
-          <div className="nueva-vacante-actions">
-            <button
-              className="nueva-vacante-cancel-btn"
+          <div className="jobs-cta" style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+          <button
+              className="jobs-apply"
               onClick={() => router.push("/empresa/vacantes")}
               disabled={saving}
+              style={{ background:"#ffffffff", color: "#1F3354" }}
             >
               Cancelar
             </button>
             
             <button
-              className="nueva-vacante-save-btn"
+              className="btn btn-primary"
               onClick={save}
               disabled={saving || !form.title.trim()}
             >
