@@ -519,7 +519,7 @@ export default function GrupoDetalle() {
                           }}>
                             <strong>⚠️ No se puede agregar</strong>
                             <div style={{ marginTop: '4px', fontSize: '14px' }}>
-                              Este alumno ya pertenece al grupo <strong>"{existingGroupInfo.groupName}"</strong> del profesor <strong>{existingGroupInfo.professorName}</strong>.
+                              Este alumno ya pertenece al grupo <strong>{existingGroupInfo.groupName}</strong> del profesor <strong>{existingGroupInfo.professorName}</strong>.
                             </div>
                             <div style={{ marginTop: '4px', fontSize: '13px', fontStyle: 'italic' }}>
                               Un alumno no puede estar en más de un grupo simultáneamente.

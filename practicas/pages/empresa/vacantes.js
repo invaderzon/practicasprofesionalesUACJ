@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { supabase } from "../../lib/supabaseClient";
 import Navbar from "../../components/navbar";
 import Footer from "../../components/footer";
+import Link from 'next/link';
 
 /* ---------- UI: logo empresa (o iniciales) ---------- */
 function LogoSquare({ src, name }) {
@@ -556,7 +557,7 @@ export default function EmpresaVacantesPage() {
       <main className="jobs-wrap" ref={pageRef}>
         {err && (
           <div className="jobs-error" role="alert">
-            {err} {!company && <a href="/empresa/signup" style={{ color:"#2563eb", textDecoration:"underline", marginLeft:8 }}>Crear empresa</a>}
+            {err} {!company && <Link href="/empresa/signup" style={{ color:"#2563eb", textDecoration:"underline", marginLeft:8 }}>Crear empresa</Link>}
           </div>
         )}
 

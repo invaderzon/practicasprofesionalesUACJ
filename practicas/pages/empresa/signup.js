@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
 import Navbar from '../../components/navbar';
 import Footer from '../../components/footer';
+import Link from 'next/link';
 
 const isProfesor = (email) => email.trim().toLowerCase().endsWith('@uacj.mx');
 const isAlumno  = (email) => email.trim().toLowerCase().endsWith('@alumnos.uacj.mx');
@@ -114,9 +115,9 @@ export default function EmpresaSignup() {
             {/* Enlace alterno al login */}
             <p className="login-company" style={{ marginTop: 12 }}>
               ¿Ya tienes cuenta?{' '}
-              <a href="/login" style={{ color: '#2563eb', textDecoration: 'underline' }}>
+              <Link href="/login" style={{ color: '#2563eb', textDecoration: 'underline' }}>
                 Inicia sesión
-              </a>
+              </Link>
             </p>
           </div>
         </div>
