@@ -71,19 +71,13 @@ export default function Home() {
               </div>
             </Link>
 
-            {/* Reglamento → externo en nueva pestaña */}
-            <a
-              href="https://urlreglamentoquetodavianotengo"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="card"
-              style={{ backgroundImage: "url('/img/Reglamento.jpg')" }}
-            >
+            {/* Profesores → /login */}
+            <Link href="/login" className="card" style={{ backgroundImage: "url('/img/Empresas.jpg')" }}>
               <div className="card-overlay">
-                <h3>Reglamento</h3>
-                <p>Consulta las normas y lineamientos que regulan el proceso de prácticas profesionales.</p>
+                <h3>Portal de Empresas</h3>
+                <p>Acceda a su listado de vacantes, posibles candidatos y.</p>
               </div>
-            </a>
+            </Link>
           </section>
         </div>
 
@@ -117,9 +111,14 @@ export default function Home() {
         </section>
 
         {/* Año */}
-        <div className="Año">
-          <h2>2025.2</h2>
-        </div>
+        <a href="https://www.uacj.mx/Calendario/index.html"
+          target="_blank"
+          rel="noopener noreferrer">
+          <div className="Año">
+            <h2>Ciclo escolar 2025.2</h2>
+          </div>
+        </a>
+
 
         {/* Más información */}
         <div className="section-container-fondo-imagen">
@@ -133,7 +132,7 @@ export default function Home() {
             <Link href={"/practicas"}>
               <button className="btn-leer-mas">Leer más</button>
             </Link>
-            
+
           </div>
         </div>
 
@@ -159,11 +158,23 @@ export default function Home() {
         {/* Información relacionada */}
         <div className="section-container">
           <h2 className="section-title">Información relacionada.</h2>
-            <section className="cards-section">
-              {infoCards.map((card) => (
-                <InfoPanel key={card.id} card={card} />
-              ))}
-            </section>
+          <section className="cards-section">
+            {/* Reglamento → externo en nueva pestaña */}
+            <a
+              href="https://www.uacj.mx/normatividad/Documents/2024/Materia-academica/REGLAMENTO-DE-PRACTICAS-PROFESIONALES-DE-LA-UACJ.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="card"
+              style={{ backgroundImage: "url('/img/Reglamento.jpg')" }}
+            >
+              <div className="card-overlay">
+                <h3>Reglamento</h3>
+              </div>
+            </a>
+            {infoCards.map((card) => (
+              <InfoPanel key={card.id} card={card} />
+            ))}
+          </section>
         </div>
 
       </div>
