@@ -710,7 +710,7 @@ export default function EstudiantesPage() {
         <div className="jobs-searchbar">
           <div className="jobs-input">
             <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
-              <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="2" />
+              <circle cx="9" cy="9" r="7" fill="#2563eb" stroke="currentColor" strokeWidth="2" />
               <line x1="14.5" y1="14.5" x2="19" y2="19" stroke="currentColor" strokeWidth="2" />
             </svg>
             <input

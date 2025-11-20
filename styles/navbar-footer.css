@@ -26,7 +26,6 @@
 
   .navbar{
       font-size: 1rem;
-      font-weight: light;
       color: white;
   }
 
@@ -38,9 +37,11 @@
   }
 
 .nav-title {
-  width: 60%;
+  width: 70%;
   padding: 0.3rem 0.6rem;
   cursor: pointer;
+  font-weight: bolder;
+  font-size: large;
   }
 
 .nav-text {
@@ -691,7 +692,7 @@
 }
 
 .footer-socials svg {
-  color: #2563eb;
+  color: #1F3354;
   width: 1.4rem;
   height: 1.4rem;
 }
@@ -702,6 +703,7 @@
   padding: 0.4rem;
   border-radius: 50px;
   background-color: #E6E7E8;
+  fill: #1F3354;
   text-decoration: none;
   margin: 1rem 0;
 }

@@ -83,7 +83,7 @@ export default function LoginPage() {
             </button>
 
             <p className="login-company">
-                ¿Eres empresa?{' '}
+                ¿Eres empresa sin cuenta aún?{' '}
               <a onClick={() => router.push('/empresa/signup')} style={{ color: '#2563eb', cursor: 'pointer' }}>
                 Regístrate aquí
               </a>
